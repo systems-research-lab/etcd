@@ -15,6 +15,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -25,8 +26,24 @@ import (
 
 // Handler for a http based key-value store backed by raft
 type httpKVAPI struct {
-	store       *kvstore
-	confChangeC chan<- raftpb.ConfChange
+	store         *kvstore
+	confChangeC   chan<- raftpb.ConfChange
+	confChangeCV2 chan<- raftpb.ConfChangeV2
+}
+
+type data struct {
+	id  uint64
+	ip  string
+	opr uint64
+}
+
+type ConfChangeJson struct {
+	data []data `json:"data"`
+	q    uint64 `json:"q"`
+}
+
+type newjson struct {
+	q uint64 `json:"q"`
 }
 
 func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -59,23 +76,98 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed on POST", http.StatusBadRequest)
 			return
 		}
+		//added by shireen
+		if key == "/confchange" {
+			byt := []byte(url)
 
-		nodeId, err := strconv.ParseUint(key[1:], 0, 64)
-		if err != nil {
-			log.Printf("Failed to convert ID for conf change (%v)\n", err)
-			http.Error(w, "Failed on POST", http.StatusBadRequest)
-			return
+			//var dat map[string]interface{}
+			var dat = map[string][]string{}
+
+			if err := json.Unmarshal(byt, &dat); err != nil {
+				panic(err)
+			}
+			ccv2 := raftpb.ConfChangeV2{
+				Transition: 3,
+				Changes:    nil,
+				Context:    nil,
+				ConfIndex:  0,
+				ConfTerm:   0,
+			}
+			var ips []string
+			var ids []string
+			var operations []string
+
+			for key, value := range dat {
+				if key == "q" {
+					var q uint64
+					q, err = strconv.ParseUint(value[0], 0, 64)
+					if err != nil {
+						log.Printf("Failed to convert quorum for conf change (%v)\n", err)
+						http.Error(w, "Failed on POST", http.StatusBadRequest)
+						return
+					}
+					ccv2.Quorum = q
+				} else if key == "ip" {
+					ips = value
+				} else if key == "id" {
+					ids = value
+				} else if key == "opr" {
+					operations = value
+				}
+			}
+			var ccsA []raftpb.ConfChangeSingle
+			if len(operations) == len(ips) && len(ips) == len(ids) {
+				j := 0
+				for range ids {
+					var ccs raftpb.ConfChangeSingle
+					var opr uint64
+					opr, err = strconv.ParseUint(operations[j], 0, 64)
+					if err != nil {
+						log.Printf("Failed to convert operation for conf change (%v)\n", err)
+						http.Error(w, "Failed on POST", http.StatusBadRequest)
+						return
+					}
+					if opr == 0 {
+						ccs.Type = raftpb.ConfChangeAddNode
+					} else if opr == 1 {
+						ccs.Type = raftpb.ConfChangeRemoveNode
+					}
+					var id uint64
+					id, err = strconv.ParseUint(ids[j], 0, 64)
+					if err != nil {
+						log.Printf("Failed to convert ID for conf change (%v)\n", err)
+						http.Error(w, "Failed on POST", http.StatusBadRequest)
+						return
+					}
+					ccs.NodeID = id
+					ccs.Context = []byte(ips[j])
+					ccsA = append(ccsA, ccs)
+					j++
+				}
+				ccv2.Changes = ccsA
+			} else {
+				panic("length not equal for ips and ids")
+			}
+
+			h.confChangeCV2 <- ccv2
+		} else {
+			nodeId, err := strconv.ParseUint(key[1:], 0, 64)
+			if err != nil {
+				log.Printf("Failed to convert ID for conf change (%v)\n", err)
+				http.Error(w, "Failed on POST", http.StatusBadRequest)
+				return
+			}
+
+			cc := raftpb.ConfChange{
+				Type:    raftpb.ConfChangeAddNode,
+				NodeID:  nodeId,
+				Context: url,
+			}
+			h.confChangeC <- cc
+
+			// As above, optimistic that raft will apply the conf change
+			w.WriteHeader(http.StatusNoContent)
 		}
-
-		cc := raftpb.ConfChange{
-			Type:    raftpb.ConfChangeAddNode,
-			NodeID:  nodeId,
-			Context: url,
-		}
-		h.confChangeC <- cc
-
-		// As above, optimistic that raft will apply the conf change
-		w.WriteHeader(http.StatusNoContent)
 	case r.Method == "DELETE":
 		nodeId, err := strconv.ParseUint(key[1:], 0, 64)
 		if err != nil {
@@ -97,17 +189,19 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Allow", "GET")
 		w.Header().Add("Allow", "POST")
 		w.Header().Add("Allow", "DELETE")
+		w.Header().Add("Access-Control-Allow-Headers", "content-type")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
 // serveHttpKVAPI starts a key-value server with a GET/PUT API and listens.
-func serveHttpKVAPI(kv *kvstore, port int, confChangeC chan<- raftpb.ConfChange, errorC <-chan error) {
+func serveHttpKVAPI(kv *kvstore, port int, confChangeC chan<- raftpb.ConfChange, confChangeCV2 chan<- raftpb.ConfChangeV2, errorC <-chan error) {
 	srv := http.Server{
 		Addr: ":" + strconv.Itoa(port),
 		Handler: &httpKVAPI{
-			store:       kv,
-			confChangeC: confChangeC,
+			store:         kv,
+			confChangeC:   confChangeC,
+			confChangeCV2: confChangeCV2,
 		},
 	}
 	go func() {

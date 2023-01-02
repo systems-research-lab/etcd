@@ -16,6 +16,7 @@ package rafthttp
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -173,13 +174,23 @@ func (t *Transport) Get(id types.ID) Peer {
 }
 
 func (t *Transport) Send(msgs []raftpb.Message) {
+
 	for _, m := range msgs {
 		if m.To == 0 {
 			// ignore intentionally dropped message
 			continue
 		}
 		to := types.ID(m.To)
-
+		for i := range m.Entries {
+			e := &m.Entries[i]
+			log.Printf("shireen in Send entries %s", e.Type)
+			switch e.Type {
+			case raftpb.EntryConfChange:
+				var cc raftpb.ConfChange
+				cc.Unmarshal(e.Data)
+				log.Printf("shireen in Send entries EntryConfChange Node ID %d, ID %d\n", cc.NodeID, cc.ID)
+			}
+		}
 		t.mu.RLock()
 		p, pok := t.peers[to]
 		g, rok := t.remotes[to]

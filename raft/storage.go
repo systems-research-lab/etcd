@@ -69,6 +69,13 @@ type Storage interface {
 	// so raft state machine could know that Storage needs some time to prepare
 	// snapshot and call Snapshot later.
 	Snapshot() (pb.Snapshot, error)
+	//added by shireen
+	//Set the current and previous confstate for restore corner case
+	SetConfState(currState pb.ConfMetadata) error
+
+	//Get the current and previous confstate for restore corner case
+	GetPrevConfState() pb.ConfMetadata
+	GetCurrentConfState() pb.ConfMetadata
 }
 
 // MemoryStorage implements the Storage interface backed by an
@@ -83,6 +90,10 @@ type MemoryStorage struct {
 	snapshot  pb.Snapshot
 	// ents[i] has raft log position i+snapshot.Metadata.Index
 	ents []pb.Entry
+
+	//added by shireen for restore corner case
+	prevconfstate pb.ConfMetadata
+	currconfstate pb.ConfMetadata
 }
 
 // NewMemoryStorage creates an empty MemoryStorage.
@@ -270,4 +281,23 @@ func (ms *MemoryStorage) Append(entries []pb.Entry) error {
 			ms.lastIndex(), entries[0].Index)
 	}
 	return nil
+}
+
+//set the previousConfState and current confState
+func (ms *MemoryStorage) SetConfState(currState pb.ConfMetadata) error {
+	ms.Lock()
+	defer ms.Unlock()
+	ms.prevconfstate = ms.currconfstate
+	ms.currconfstate = currState
+	return nil
+}
+
+//get the previous confstate
+func (ms *MemoryStorage) GetPrevConfState() pb.ConfMetadata {
+	return ms.prevconfstate
+}
+
+//get the current confstate
+func (ms *MemoryStorage) GetCurrentConfState() pb.ConfMetadata {
+	return ms.currconfstate
 }

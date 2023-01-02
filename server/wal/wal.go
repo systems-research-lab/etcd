@@ -41,6 +41,8 @@ const (
 	stateType
 	crcType
 	snapshotType
+	//added shireen for restore corner case
+	prevconfType
 
 	// warnSyncDuration is the amount of time allotted to an fsync before
 	// logging a warning
@@ -92,6 +94,9 @@ type WAL struct {
 
 	locks []*fileutil.LockedFile // the locked files the WAL holds (the name is increasing)
 	fp    *filePipeline
+
+	//added by shireen for storing prev conf for restore corner case
+	prevcm raftpb.ConfMetadata
 }
 
 // Create creates a WAL ready for appending records. The given metadata is
@@ -429,6 +434,7 @@ func openWALFiles(lg *zap.Logger, dirpath string, names []string, nameIndex int,
 //
 // ReadAll may return uncommitted yet entries, that are subject to be overriden.
 // Do not apply entries that have index > state.commit, as they are subject to change.
+// verfiy the changes
 func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.Entry, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -488,7 +494,17 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 				}
 				match = true
 			}
-
+		// added by shireen for restore corner case
+		case prevconfType:
+			var confcm walpb.ConfMetadata
+			pbutil.MustUnmarshal(&confcm, rec.Data)
+			if confcm.Index == w.start.Index {
+				if confcm.Term != w.start.Term {
+					state.Reset()
+					return nil, state, nil, ErrSnapshotMismatch
+				}
+				match = true
+			}
 		default:
 			state.Reset()
 			return nil, state, nil, fmt.Errorf("unexpected block type %d", rec.Type)
@@ -1003,4 +1019,54 @@ func closeAll(lg *zap.Logger, rcs ...io.ReadCloser) error {
 		return nil
 	}
 	return errors.New(strings.Join(stringArr, ", "))
+}
+
+// added by shireen for restore prev conf corner case
+func (w *WAL) savePrevConfState(s *raftpb.ConfMetadata) error {
+	if raft.IsEmptyConfMetadata(*s) {
+		return nil
+	}
+	w.prevcm = *s
+	b := pbutil.MustMarshal(s)
+	rec := &walpb.Record{Type: prevconfType, Data: b}
+	return w.encoder.encode(rec)
+}
+
+func (w *WAL) SaveWithConfState(st raftpb.HardState, ents []raftpb.Entry, prevConf raftpb.ConfMetadata) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// short cut, do not call sync
+	if raft.IsEmptyHardState(st) && len(ents) == 0 {
+		return nil
+	}
+	// doubt about it ??
+	mustSync := raft.MustSync(st, w.state, len(ents))
+
+	// TODO(xiangli): no more reference operator
+	for i := range ents {
+		if err := w.saveEntry(&ents[i]); err != nil {
+			return err
+		}
+	}
+	if err := w.saveState(&st); err != nil {
+		return err
+	}
+
+	if err := w.savePrevConfState(&prevConf); err != nil {
+		return err
+	}
+
+	curOff, err := w.tail().Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	if curOff < SegmentSizeBytes {
+		if mustSync {
+			return w.sync()
+		}
+		return nil
+	}
+
+	return w.cut()
 }

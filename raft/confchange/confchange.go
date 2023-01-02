@@ -31,6 +31,7 @@ import (
 type Changer struct {
 	Tracker   tracker.ProgressTracker
 	LastIndex uint64
+	Quorum    uint64
 }
 
 // EnterJoint verifies that the outgoing (=right) majority config of the joint
@@ -139,9 +140,9 @@ func (c Changer) Simple(ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.Pro
 	if err := c.apply(&cfg, prs, ccs...); err != nil {
 		return c.err(err)
 	}
-	if n := symdiff(incoming(c.Tracker.Voters), incoming(cfg.Voters)); n > 1 {
+	/**if n := symdiff(incoming(c.Tracker.Voters), incoming(cfg.Voters)); n > 1 {
 		return tracker.Config{}, nil, errors.New("more than one voter changed without entering joint config")
-	}
+	}**/
 
 	return checkAndReturn(cfg, prs)
 }
@@ -339,6 +340,8 @@ func checkInvariants(cfg tracker.Config, prs tracker.ProgressMap) error {
 func (c Changer) checkAndCopy() (tracker.Config, tracker.ProgressMap, error) {
 	cfg := c.Tracker.Config.Clone()
 	prs := tracker.ProgressMap{}
+	//added quorum size changes by shireen
+	cfg.Quorum = c.Quorum
 
 	for id, pr := range c.Tracker.Progress {
 		// A shallow copy is enough because we only mutate the Learner field.

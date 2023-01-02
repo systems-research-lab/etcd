@@ -152,15 +152,24 @@ func (rn *RawNode) acceptReady(rd Ready) {
 func (rn *RawNode) HasReady() bool {
 	r := rn.raft
 	if !r.softState().equal(rn.prevSoftSt) {
+		r.logger.Infof("%x soft state change %d", r.id, r.Term)
 		return true
 	}
 	if hardSt := r.hardState(); !IsEmptyHardState(hardSt) && !isHardStateEqual(hardSt, rn.prevHardSt) {
+		r.logger.Infof("previous hard state change %d %d %d", rn.prevHardSt.Vote, rn.prevHardSt.Commit, rn.prevHardSt.Term)
+		r.logger.Infof(" hard state change %d %d %d", hardSt.Vote, hardSt.Commit, hardSt.Term)
 		return true
 	}
 	if r.raftLog.hasPendingSnapshot() {
 		return true
 	}
 	if len(r.msgs) > 0 || len(r.raftLog.unstableEntries()) > 0 || r.raftLog.hasNextEnts() {
+		a := len(r.msgs)
+		b := len(r.raftLog.unstableEntries())
+		c := r.raftLog.hasNextEnts()
+		if len(r.raftLog.unstableEntries()) > 0 || r.raftLog.hasNextEnts() {
+			r.logger.Infof(" hard state change a %d, b %d, c %t", a, b, c)
+		}
 		return true
 	}
 	if len(r.readStates) != 0 {

@@ -44,10 +44,11 @@ type commit struct {
 
 // A key-value stream backed by raft
 type raftNode struct {
-	proposeC    <-chan string            // proposed messages (k,v)
-	confChangeC <-chan raftpb.ConfChange // proposed cluster config changes
-	commitC     chan<- *commit           // entries committed to log (k,v)
-	errorC      chan<- error             // errors from raft session
+	proposeC      <-chan string              // proposed messages (k,v)
+	confChangeC   <-chan raftpb.ConfChange   // proposed cluster config changes
+	confChangeCV2 <-chan raftpb.ConfChangeV2 // proposed cluster config changes, added by shireen
+	commitC       chan<- *commit             // entries committed to log (k,v)
+	errorC        chan<- error               // errors from raft session
 
 	id          int      // client ID for raft session
 	peers       []string // raft peer URLs
@@ -85,26 +86,27 @@ var defaultSnapshotCount uint64 = 10000
 // commit channel, followed by a nil message (to indicate the channel is
 // current), then new log entries. To shutdown, close proposeC and read errorC.
 func newRaftNode(id int, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan string,
-	confChangeC <-chan raftpb.ConfChange) (<-chan *commit, <-chan error, <-chan *snap.Snapshotter) {
+	confChangeC <-chan raftpb.ConfChange, confChangeCV2 <-chan raftpb.ConfChangeV2) (<-chan *commit, <-chan error, <-chan *snap.Snapshotter) {
 
 	commitC := make(chan *commit)
 	errorC := make(chan error)
 
 	rc := &raftNode{
-		proposeC:    proposeC,
-		confChangeC: confChangeC,
-		commitC:     commitC,
-		errorC:      errorC,
-		id:          id,
-		peers:       peers,
-		join:        join,
-		waldir:      fmt.Sprintf("raftexample-%d", id),
-		snapdir:     fmt.Sprintf("raftexample-%d-snap", id),
-		getSnapshot: getSnapshot,
-		snapCount:   defaultSnapshotCount,
-		stopc:       make(chan struct{}),
-		httpstopc:   make(chan struct{}),
-		httpdonec:   make(chan struct{}),
+		proposeC:      proposeC,
+		confChangeC:   confChangeC,
+		confChangeCV2: confChangeCV2,
+		commitC:       commitC,
+		errorC:        errorC,
+		id:            id,
+		peers:         peers,
+		join:          join,
+		waldir:        fmt.Sprintf("raftexample-%d", id),
+		snapdir:       fmt.Sprintf("raftexample-%d-snap", id),
+		getSnapshot:   getSnapshot,
+		snapCount:     defaultSnapshotCount,
+		stopc:         make(chan struct{}),
+		httpstopc:     make(chan struct{}),
+		httpdonec:     make(chan struct{}),
 
 		logger: zap.NewExample(),
 
@@ -149,11 +151,10 @@ func (rc *raftNode) entriesToApply(ents []raftpb.Entry) (nents []raftpb.Entry) {
 
 // publishEntries writes committed log entries to commit channel and returns
 // whether all entries could be published.
-func (rc *raftNode) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) {
+func (rc *raftNode) publishEntries(ents []raftpb.Entry, currentConfIndex uint64) (<-chan struct{}, bool) {
 	if len(ents) == 0 {
 		return nil, true
 	}
-
 	data := make([]string, 0, len(ents))
 	for i := range ents {
 		switch ents[i].Type {
@@ -165,20 +166,45 @@ func (rc *raftNode) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) 
 			s := string(ents[i].Data)
 			data = append(data, s)
 		case raftpb.EntryConfChange:
-			var cc raftpb.ConfChange
-			cc.Unmarshal(ents[i].Data)
-			rc.confState = *rc.node.ApplyConfChange(cc)
-			switch cc.Type {
-			case raftpb.ConfChangeAddNode:
-				if len(cc.Context) > 0 {
-					rc.transport.AddPeer(types.ID(cc.NodeID), []string{string(cc.Context)})
+			if ents[i].Index > currentConfIndex {
+				var cc raftpb.ConfChange
+				cc.Unmarshal(ents[i].Data)
+				rc.confState = *rc.node.ApplyConfChangeConfAddEntry(cc, ents[i].Index, ents[i].Term)
+				switch cc.Type {
+				case raftpb.ConfChangeAddNode:
+					if len(cc.Context) > 0 {
+						rc.transport.AddPeer(types.ID(cc.NodeID), []string{string(cc.Context)})
+					}
+				case raftpb.ConfChangeRemoveNode:
+					if cc.NodeID == uint64(rc.id) {
+						log.Println("I've been removed from the cluster! Shutting down.")
+						return nil, false
+					}
+					rc.transport.RemovePeer(types.ID(cc.NodeID))
+
 				}
-			case raftpb.ConfChangeRemoveNode:
-				if cc.NodeID == uint64(rc.id) {
-					log.Println("I've been removed from the cluster! Shutting down.")
-					return nil, false
+			}
+		case raftpb.EntryConfChangeV2:
+			if ents[i].Index > currentConfIndex {
+				log.Printf("%d entries leng EntryConfChange, %d index  ", len(ents), ents[i].Index)
+				var cc raftpb.ConfChangeV2
+				cc.Unmarshal(ents[i].Data)
+				rc.confState = *rc.node.ApplyConfChangeConfAddEntry(cc, ents[i].Index, ents[i].Term)
+				for j := range cc.Changes {
+					ccs := &cc.Changes[j]
+					switch ccs.Type {
+					case raftpb.ConfChangeAddNode:
+						if len(ccs.Context) > 0 {
+							rc.transport.AddPeer(types.ID(ccs.NodeID), []string{string(ccs.Context)})
+						}
+					case raftpb.ConfChangeRemoveNode:
+						if ccs.NodeID == uint64(rc.id) {
+							log.Println("I've been removed from the cluster! Shutting down.")
+							return nil, false
+						}
+						rc.transport.RemovePeer(types.ID(ccs.NodeID))
+					}
 				}
-				rc.transport.RemovePeer(types.ID(cc.NodeID))
 			}
 		}
 	}
@@ -198,6 +224,67 @@ func (rc *raftNode) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) 
 	rc.appliedIndex = ents[len(ents)-1].Index
 
 	return applyDoneC, true
+}
+
+// apply configuration change when entries are added.
+func (rc *raftNode) applyConfigurationAddEntries(ents []raftpb.Entry, currentConfIndex uint64) (bool, uint64) {
+	if len(ents) == 0 {
+		return true, 0
+	}
+	var i int = 32
+	localconfindex := uint64(i)
+	localconfindex = 0
+	log.Printf("%d entries leng", len(ents))
+	for i := range ents {
+		e := &ents[i]
+		if e.Type == raftpb.EntryConfChange {
+			if ents[i].Index > currentConfIndex {
+				log.Printf("%d entries leng EntryConfChange", len(ents))
+				var cc raftpb.ConfChange
+				cc.Unmarshal(e.Data)
+				rc.confState = *rc.node.ApplyConfChangeConfAddEntry(cc, e.Index, e.Term)
+				localconfindex = e.Index
+				switch cc.Type {
+				case raftpb.ConfChangeAddNode:
+					if len(cc.Context) > 0 {
+						rc.transport.AddPeer(types.ID(cc.NodeID), []string{string(cc.Context)})
+					}
+				case raftpb.ConfChangeRemoveNode:
+					if cc.NodeID == uint64(rc.id) {
+						log.Println("I've been removed from the cluster! Shutting down.")
+						return false, 0
+					}
+					rc.transport.RemovePeer(types.ID(cc.NodeID))
+				}
+			}
+		} else if e.Type == raftpb.EntryConfChangeV2 {
+			if ents[i].Index > currentConfIndex {
+				log.Printf("%d entries leng EntryConfChange", len(ents))
+				var cc raftpb.ConfChangeV2
+				cc.Unmarshal(e.Data)
+				rc.confState = *rc.node.ApplyConfChangeConfAddEntry(cc, e.Index, e.Term)
+				localconfindex = e.Index
+				for j := range cc.Changes {
+					ccs := &cc.Changes[j]
+					switch ccs.Type {
+					case raftpb.ConfChangeAddNode:
+						if len(ccs.Context) > 0 {
+							rc.transport.AddPeer(types.ID(ccs.NodeID), []string{string(ccs.Context)})
+						}
+					case raftpb.ConfChangeRemoveNode:
+						if ccs.NodeID == uint64(rc.id) {
+							log.Println("I've been removed from the cluster! Shutting down.")
+							return false, 0
+						}
+						rc.transport.RemovePeer(types.ID(ccs.NodeID))
+					}
+				}
+			}
+		} else {
+			log.Printf("%d entries leng else ", len(ents))
+		}
+	}
+	return true, localconfindex
 }
 
 func (rc *raftNode) loadSnapshot() *raftpb.Snapshot {
@@ -417,7 +504,7 @@ func (rc *raftNode) serveChannels() {
 	go func() {
 		confChangeCount := uint64(0)
 
-		for rc.proposeC != nil && rc.confChangeC != nil {
+		for rc.proposeC != nil && rc.confChangeC != nil && rc.confChangeCV2 != nil {
 			select {
 			case prop, ok := <-rc.proposeC:
 				if !ok {
@@ -435,6 +522,13 @@ func (rc *raftNode) serveChannels() {
 					cc.ID = confChangeCount
 					rc.node.ProposeConfChange(context.TODO(), cc)
 				}
+			case ccv2, ok := <-rc.confChangeCV2:
+				if !ok {
+					rc.confChangeCV2 = nil
+				} else {
+					confChangeCount++
+					rc.node.ProposeConfChange(context.TODO(), ccv2)
+				}
 			}
 		}
 		// client closed channel; shutdown raft if not already
@@ -449,7 +543,19 @@ func (rc *raftNode) serveChannels() {
 
 		// store raft entries to wal, then publish over commit channel
 		case rd := <-rc.node.Ready():
-			rc.wal.Save(rd.HardState, rd.Entries)
+			//added by shireen
+			ok, localconfindex := rc.applyConfigurationAddEntries(rd.Entries, rd.CurrentConfIndex)
+			if !ok {
+				rc.stop()
+				return
+			}
+			//added by shireen for the storing the prev configuration for restore corner case
+			if !raft.IsEmptyConfMetadata(rd.CurrentConfMetadata) {
+				rc.wal.SaveWithConfState(rd.HardState, rd.Entries, rc.raftStorage.GetCurrentConfState())
+				rc.raftStorage.SetConfState(rd.CurrentConfMetadata)
+			} else {
+				rc.wal.Save(rd.HardState, rd.Entries)
+			}
 			if !raft.IsEmptySnap(rd.Snapshot) {
 				rc.saveSnap(rd.Snapshot)
 				rc.raftStorage.ApplySnapshot(rd.Snapshot)
@@ -457,12 +563,22 @@ func (rc *raftNode) serveChannels() {
 			}
 			rc.raftStorage.Append(rd.Entries)
 			rc.transport.Send(rd.Messages)
-			applyDoneC, ok := rc.publishEntries(rc.entriesToApply(rd.CommittedEntries))
-			if !ok {
-				rc.stop()
-				return
+			if localconfindex == 0 {
+				applyDoneC, ok := rc.publishEntries(rc.entriesToApply(rd.CommittedEntries), rd.CurrentConfIndex)
+				if !ok {
+					rc.stop()
+					return
+				}
+				rc.maybeTriggerSnapshot(applyDoneC)
+			} else {
+				applyDoneC, ok := rc.publishEntries(rc.entriesToApply(rd.CommittedEntries), localconfindex)
+				if !ok {
+					rc.stop()
+					return
+				}
+				rc.maybeTriggerSnapshot(applyDoneC)
 			}
-			rc.maybeTriggerSnapshot(applyDoneC)
+
 			rc.node.Advance()
 
 		case err := <-rc.transport.ErrorC:

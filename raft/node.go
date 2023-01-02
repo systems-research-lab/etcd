@@ -87,6 +87,11 @@ type Ready struct {
 	// MustSync indicates whether the HardState and Entries must be synchronously
 	// written to disk or if an asynchronous write is permissible.
 	MustSync bool
+
+	//added by shireen
+	//maintaining the current configuration index
+	CurrentConfIndex    uint64
+	CurrentConfMetadata pb.ConfMetadata
 }
 
 func isHardStateEqual(a, b pb.HardState) bool {
@@ -175,6 +180,9 @@ type Node interface {
 	// Returns an opaque non-nil ConfState protobuf which must be recorded in
 	// snapshots.
 	ApplyConfChange(cc pb.ConfChangeI) *pb.ConfState
+
+	//added by shireen
+	ApplyConfChangeConfAddEntry(cc pb.ConfChangeI, confIndex uint64, confTerm uint64) *pb.ConfState
 
 	// TransferLeadership attempts to transfer leadership to the given transferee.
 	TransferLeadership(ctx context.Context, lead, transferee uint64)
@@ -357,6 +365,7 @@ func (n *node) run() {
 			}
 		case cc := <-n.confc:
 			_, okBefore := r.prs.Progress[r.id]
+			r.logger.Infof("shireen in node.go n.confc")
 			cs := r.applyConfChange(cc)
 			// If the node was removed, block incoming proposals. Note that we
 			// only do this if the node was in the config before. Nodes may be
@@ -561,7 +570,11 @@ func newReady(r *raft, prevSoftSt *SoftState, prevHardSt pb.HardState) Ready {
 		Entries:          r.raftLog.unstableEntries(),
 		CommittedEntries: r.raftLog.nextEnts(),
 		Messages:         r.msgs,
+		//added by shireen for restore
+		CurrentConfIndex:    r.currentConfIndex,
+		CurrentConfMetadata: r.currentConfMetadata,
 	}
+	//r.logger.Infof("raft.node: r.currentConfMetadata index %d term %x", r.currentConfMetadata.Index, r.currentConfMetadata.Term)
 	if softSt := r.softState(); !softSt.equal(prevSoftSt) {
 		rd.SoftState = softSt
 	}
@@ -587,4 +600,27 @@ func MustSync(st, prevst pb.HardState, entsnum int) bool {
 	// votedFor
 	// log entries[]
 	return entsnum != 0 || st.Vote != prevst.Vote || st.Term != prevst.Term
+}
+
+//added by shireen
+func (n *node) ApplyConfChangeConfAddEntry(cc pb.ConfChangeI, confIndex uint64, confTerm uint64) *pb.ConfState {
+	var cs pb.ConfState
+	var ccv2 pb.ConfChangeV2
+	ccv2 = cc.AsV2()
+	ccv2.ConfIndex = confIndex
+	ccv2.ConfTerm = confTerm
+	select {
+	case n.confc <- ccv2:
+	case <-n.done:
+	}
+	select {
+	case cs = <-n.confstatec:
+	case <-n.done:
+	}
+	return &cs
+}
+
+// IsEmptyConfMetadata returns true if the given confmetadata is empty.
+func IsEmptyConfMetadata(cmd pb.ConfMetadata) bool {
+	return cmd.Index == 0
 }

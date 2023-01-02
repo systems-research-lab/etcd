@@ -74,7 +74,12 @@ func (rn *RawNode) Bootstrap(peers []Peer) error {
 	// the invariant that committed < unstable?
 	rn.raft.raftLog.committed = uint64(len(ents))
 	for _, peer := range peers {
-		rn.raft.applyConfChange(pb.ConfChange{NodeID: peer.ID, Type: pb.ConfChangeAddNode}.AsV2())
+		//changed by shireen
+		cc := pb.ConfChange{NodeID: peer.ID, Type: pb.ConfChangeAddNode}
+		ccv2 := cc.AsV2()
+		ccv2.ConfIndex = rn.raft.raftLog.committed
+		ccv2.ConfTerm = 1
+		rn.raft.applyConfChange(ccv2)
 	}
 	return nil
 }

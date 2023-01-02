@@ -313,6 +313,10 @@ type raft struct {
 	// current term. Those will be handled as fast as first log is committed in
 	// current term.
 	pendingReadIndexMessages []pb.Message
+
+	//for applying configuration change during restore
+	currentConfIndex    uint64
+	currentConfMetadata pb.ConfMetadata
 }
 
 func newRaft(c *Config) *raft {
@@ -342,6 +346,9 @@ func newRaft(c *Config) *raft {
 		disableProposalForwarding: c.DisableProposalForwarding,
 	}
 
+	//added by shireen for getting confstate in storage for restore
+	r.currentConfMetadata = c.Storage.GetCurrentConfState()
+
 	cfg, prs, err := confchange.Restore(confchange.Changer{
 		Tracker:   r.prs,
 		LastIndex: raftlog.lastIndex(),
@@ -349,6 +356,7 @@ func newRaft(c *Config) *raft {
 	if err != nil {
 		panic(err)
 	}
+
 	assertConfStatesEquivalent(r.logger, cs, r.switchToConfig(cfg, prs))
 
 	if !IsEmptyHardState(hs) {
@@ -577,13 +585,21 @@ func (r *raft) advance(rd Ready) {
 	if !IsEmptySnap(rd.Snapshot) {
 		r.raftLog.stableSnapTo(rd.Snapshot.Metadata.Index)
 	}
+
+	if !IsEmptyConfMetadata(rd.CurrentConfMetadata) {
+		if r.currentConfMetadata.Index == rd.CurrentConfMetadata.Index {
+			r.logger.Infof("CurrentConfMetadata in advance")
+			r.currentConfMetadata.Index = 0
+		}
+	}
 }
 
 // maybeCommit attempts to advance the commit index. Returns true if
 // the commit index changed (in which case the caller should call
 // r.bcastAppend).
 func (r *raft) maybeCommit() bool {
-	mci := r.prs.Committed()
+
+	mci := r.prs.Committed(r.prs.Config.Quorum)
 	return r.raftLog.maybeCommit(mci, r.Term)
 }
 
@@ -619,6 +635,7 @@ func (r *raft) reset(term uint64) {
 }
 
 func (r *raft) appendEntry(es ...pb.Entry) (accepted bool) {
+	r.logger.Infof("shireen in appendEntry")
 	li := r.raftLog.lastIndex()
 	for i := range es {
 		es[i].Term = r.Term
@@ -835,7 +852,7 @@ func (r *raft) poll(id uint64, t pb.MessageType, v bool) (granted int, rejected 
 		r.logger.Infof("%x received %s rejection from %x at term %d", r.id, t, id, r.Term)
 	}
 	r.prs.RecordVote(id, v)
-	return r.prs.TallyVotes()
+	return r.prs.TallyVotes(r.prs.Config.Quorum)
 }
 
 func (r *raft) Step(m pb.Message) error {
@@ -998,7 +1015,7 @@ func stepLeader(r *raft, m pb.Message) error {
 		if pr := r.prs.Progress[r.id]; pr != nil {
 			pr.RecentActive = true
 		}
-		if !r.prs.QuorumActive() {
+		if !r.prs.QuorumActive(r.prs.Config.Quorum) {
 			r.logger.Warningf("%x stepped down to follower since quorum is not active", r.id)
 			r.becomeFollower(r.Term, None)
 		}
@@ -1024,7 +1041,7 @@ func stepLeader(r *raft, m pb.Message) error {
 			r.logger.Debugf("%x [term %d] transfer leadership to %x is in progress; dropping proposal", r.id, r.Term, r.leadTransferee)
 			return ErrProposalDropped
 		}
-
+		var ignoreConfEntry bool
 		for i := range m.Entries {
 			e := &m.Entries[i]
 			var cc pb.ConfChangeI
@@ -1041,15 +1058,16 @@ func stepLeader(r *raft, m pb.Message) error {
 				}
 				cc = ccc
 			}
+			ignoreConfEntry = false
 			if cc != nil {
-				alreadyPending := r.pendingConfIndex > r.raftLog.applied
+				//alreadyPending := r.pendingConfIndex > r.raftLog.applied
 				alreadyJoint := len(r.prs.Config.Voters[1]) > 0
-				wantsLeaveJoint := len(cc.AsV2().Changes) == 0
+				wantsLeaveJoint := len(cc.AsV2().Changes) == 0 && cc.AsV2().Quorum == 0
 
 				var refused string
-				if alreadyPending {
+				/**if alreadyPending {
 					refused = fmt.Sprintf("possible unapplied conf change at index %d (applied to %d)", r.pendingConfIndex, r.raftLog.applied)
-				} else if alreadyJoint && !wantsLeaveJoint {
+				} else **/if alreadyJoint && !wantsLeaveJoint {
 					refused = "must transition out of joint config first"
 				} else if !alreadyJoint && wantsLeaveJoint {
 					refused = "not in joint state; refusing empty conf change"
@@ -1058,16 +1076,24 @@ func stepLeader(r *raft, m pb.Message) error {
 				if refused != "" {
 					r.logger.Infof("%x ignoring conf change %v at config %s: %s", r.id, cc, r.prs.Config, refused)
 					m.Entries[i] = pb.Entry{Type: pb.EntryNormal}
+				} else if r.pendingConfIndex > r.raftLog.applied || !r.committedEntryInCurrentTerm() {
+					r.logger.Infof("%x ignoring conf change by shireen %v at config %s: %s", r.id, cc, r.prs.Config, refused)
+					ignoreConfEntry = true
 				} else {
 					r.pendingConfIndex = r.raftLog.lastIndex() + uint64(i) + 1
 				}
+
 			}
 		}
-
-		if !r.appendEntry(m.Entries...) {
-			return ErrProposalDropped
+		//shireen changes preventing future conf entry to be applied untill this conf entry is committed
+		//untill an entry has been committed in the current term preventing the current conf entry to be
+		//added to the log
+		if !ignoreConfEntry {
+			if !r.appendEntry(m.Entries...) {
+				return ErrProposalDropped
+			}
+			r.bcastAppend()
 		}
-		r.bcastAppend()
 		return nil
 	case pb.MsgReadIndex:
 		// only one voting member (the leader) in the cluster
@@ -1291,7 +1317,7 @@ func stepLeader(r *raft, m pb.Message) error {
 			return nil
 		}
 
-		if r.prs.Voters.VoteResult(r.readOnly.recvAck(m.From, m.Context)) != quorum.VoteWon {
+		if r.prs.Voters.VoteResult(r.readOnly.recvAck(m.From, m.Context), r.prs.Config.Quorum) != quorum.VoteWon {
 			return nil
 		}
 
@@ -1467,6 +1493,7 @@ func stepFollower(r *raft, m pb.Message) error {
 }
 
 func (r *raft) handleAppendEntries(m pb.Message) {
+	r.logger.Infof("shireen in handleAppendEntries")
 	if m.Index < r.raftLog.committed {
 		r.send(pb.Message{To: m.From, Type: pb.MsgAppResp, Index: r.raftLog.committed})
 		return
@@ -1474,6 +1501,12 @@ func (r *raft) handleAppendEntries(m pb.Message) {
 
 	if mlastIndex, ok := r.raftLog.maybeAppend(m.Index, m.LogTerm, m.Commit, m.Entries...); ok {
 		r.send(pb.Message{To: m.From, Type: pb.MsgAppResp, Index: mlastIndex})
+		//added by shireen for restoring the prev conf
+		prevConfMetadeta := r.raftLog.storage.GetPrevConfState()
+		if r.restorePreviousConf(r.raftLog.storage.GetCurrentConfState(), prevConfMetadeta) {
+			r.logger.Infof("%x [commit: %d] restored prev configuration [index: %d, term: %d]",
+				r.id, r.raftLog.committed, prevConfMetadeta.Index, prevConfMetadeta.Term)
+		}
 	} else {
 		r.logger.Debugf("%x [logterm: %d, index: %d] rejected MsgApp [logterm: %d, index: %d] from %x",
 			r.id, r.raftLog.zeroTermOnErrCompacted(r.raftLog.term(m.Index)), m.Index, m.LogTerm, m.Index, m.From)
@@ -1501,7 +1534,82 @@ func (r *raft) handleAppendEntries(m pb.Message) {
 			RejectHint: hintIndex,
 			LogTerm:    hintTerm,
 		})
+
 	}
+}
+
+//added by shireen for restoring the prv conf
+func (r *raft) restorePreviousConf(currentConf pb.ConfMetadata, prevConf pb.ConfMetadata) bool {
+	r.logger.Infof("shireen in restorePreviousConf")
+	if currentConf.Index <= r.raftLog.committed {
+		return false
+	}
+
+	found := false
+	cs := currentConf.ConfState
+
+	for _, set := range [][]uint64{
+		cs.Voters,
+		cs.Learners,
+		cs.VotersOutgoing,
+		// `LearnersNext` doesn't need to be checked. According to the rules, if a peer in
+		// `LearnersNext`, it has to be in `VotersOutgoing`.
+	} {
+		for _, id := range set {
+			if id == r.id {
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+	}
+	if !found {
+		r.logger.Warningf(
+			"%x attempted to restore previous Conf but node is not in the ConfState %v; should never happen",
+			r.id, cs,
+		)
+		return false
+	}
+
+	// double check below function for restoring previous configuration .
+
+	if r.raftLog.matchTerm(currentConf.Index, currentConf.Term) {
+		r.logger.Infof("%x [commit: %d, lastindex: %d, lastterm: %d] current conf term and index matches [index: %d, term: %d]",
+			r.id, r.raftLog.committed, r.raftLog.lastIndex(), r.raftLog.lastTerm(), currentConf.Index, currentConf.Term)
+		//r.raftLog.commitTo(cm.Index)
+		//ask professor do we have to check whether current configuration is still active or not, if not then switch to it ?
+		return false
+	}
+	//r.raftLog.restore(s)
+
+	if !r.raftLog.matchTerm(prevConf.Index, prevConf.Term) {
+		panic(fmt.Sprintf("unable to restore prev config %+v: %s", cs))
+	}
+
+	// Reset the configuration and add the (potentially updated) peers in anew.
+	r.prs = tracker.MakeProgressTracker(r.prs.MaxInflight)
+	cfg, prs, err := confchange.Restore(confchange.Changer{
+		Tracker:   r.prs,
+		LastIndex: r.raftLog.lastIndex(),
+	}, prevConf.ConfState)
+
+	if err != nil {
+		// This should never happen. Either there's a bug in our config change
+		// handling or the client corrupted the conf change.
+		panic(fmt.Sprintf("unable to restore config %+v: %s", cs, err))
+	}
+
+	assertConfStatesEquivalent(r.logger, prevConf.ConfState, r.switchToConfig(cfg, prs))
+
+	pr := r.prs.Progress[r.id]
+	pr.MaybeUpdate(pr.Next - 1) // check it again
+
+	r.logger.Infof("%x [commit: %d, lastindex: %d, lastterm: %d] restored prev conf [index: %d, term: %d]",
+		r.id, r.raftLog.committed, r.raftLog.lastIndex(), r.raftLog.lastTerm(), prevConf.Index, prevConf.Term)
+
+	return true
 }
 
 func (r *raft) handleHeartbeat(m pb.Message) {
@@ -1510,6 +1618,7 @@ func (r *raft) handleHeartbeat(m pb.Message) {
 }
 
 func (r *raft) handleSnapshot(m pb.Message) {
+	r.logger.Infof("shireen in handleSnapshot")
 	sindex, sterm := m.Snapshot.Metadata.Index, m.Snapshot.Metadata.Term
 	if r.restore(m.Snapshot) {
 		r.logger.Infof("%x [commit: %d] restored snapshot [index: %d, term: %d]",
@@ -1526,6 +1635,7 @@ func (r *raft) handleSnapshot(m pb.Message) {
 // configuration of state machine. If this method returns false, the snapshot was
 // ignored, either because it was obsolete or because of an error.
 func (r *raft) restore(s pb.Snapshot) bool {
+	r.logger.Infof("shireen in restore")
 	if s.Metadata.Index <= r.raftLog.committed {
 		return false
 	}
@@ -1615,10 +1725,23 @@ func (r *raft) promotable() bool {
 }
 
 func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
+	r.logger.Infof("shireen in applyConfChange")
+
+	//added by shireen for confIndex changes
+	r.currentConfIndex = cc.ConfIndex
+	r.currentConfMetadata.Term = cc.ConfTerm
+	r.currentConfMetadata.Index = cc.ConfIndex
+
+	if cc.Quorum == 1000 {
+		cc.Quorum = 0
+	}
+	r.logger.Infof("applyConfChange %d, %d and r.currentConfIndex %d", r.currentConfMetadata.Index, r.currentConfMetadata.Term, r.currentConfIndex)
+
 	cfg, prs, err := func() (tracker.Config, tracker.ProgressMap, error) {
 		changer := confchange.Changer{
 			Tracker:   r.prs,
 			LastIndex: r.raftLog.lastIndex(),
+			Quorum:    cc.Quorum,
 		}
 		if cc.LeaveJoint() {
 			return changer.LeaveJoint()
@@ -1632,8 +1755,10 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 		// TODO(tbg): return the error to the caller.
 		panic(err)
 	}
+	//added by shireen for conf change restore corner case
+	r.currentConfMetadata.ConfState = r.switchToConfig(cfg, prs)
 
-	return r.switchToConfig(cfg, prs)
+	return r.currentConfMetadata.ConfState
 }
 
 // switchToConfig reconfigures this node to use the provided configuration. It
@@ -1643,11 +1768,13 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 //
 // The inputs usually result from restoring a ConfState or applying a ConfChange.
 func (r *raft) switchToConfig(cfg tracker.Config, prs tracker.ProgressMap) pb.ConfState {
+	r.logger.Infof("shireen in switchToConfig")
 	r.prs.Config = cfg
 	r.prs.Progress = prs
 
 	r.logger.Infof("%x switched to configuration %s", r.id, r.prs.Config)
 	cs := r.prs.ConfState()
+
 	pr, ok := r.prs.Progress[r.id]
 
 	// Update whether the node itself is a learner, resetting to false when the

@@ -34,6 +34,11 @@ type rawNodeAdapter struct {
 	*RawNode
 }
 
+func (a *rawNodeAdapter) ApplyConfChangeConfAddEntry(cc pb.ConfChangeI, confIndex uint64) *pb.ConfState {
+	//TODO implement me
+	panic("implement me")
+}
+
 var _ Node = (*rawNodeAdapter)(nil)
 
 // Node specifies lead, which is pointless, can just be filled in.

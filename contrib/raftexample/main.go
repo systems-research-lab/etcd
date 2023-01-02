@@ -32,14 +32,17 @@ func main() {
 	defer close(proposeC)
 	confChangeC := make(chan raftpb.ConfChange)
 	defer close(confChangeC)
+	//added by shireen
+	confChangeCV2 := make(chan raftpb.ConfChangeV2)
+	defer close(confChangeCV2)
 
 	// raft provides a commit stream for the proposals from the http api
 	var kvs *kvstore
 	getSnapshot := func() ([]byte, error) { return kvs.getSnapshot() }
-	commitC, errorC, snapshotterReady := newRaftNode(*id, strings.Split(*cluster, ","), *join, getSnapshot, proposeC, confChangeC)
+	commitC, errorC, snapshotterReady := newRaftNode(*id, strings.Split(*cluster, ","), *join, getSnapshot, proposeC, confChangeC, confChangeCV2)
 
 	kvs = newKVStore(<-snapshotterReady, proposeC, commitC, errorC)
 
 	// the key-value http handler will propose updates to raft
-	serveHttpKVAPI(kvs, *kvport, confChangeC, errorC)
+	serveHttpKVAPI(kvs, *kvport, confChangeC, confChangeCV2, errorC)
 }

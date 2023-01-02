@@ -75,6 +75,9 @@ type Config struct {
 	// right away when entering the joint configuration, so that it is caught up
 	// as soon as possible.
 	LearnersNext map[uint64]struct{}
+
+	//added by shireen for configuration change
+	Quorum uint64
 }
 
 func (c Config) String() string {
@@ -108,6 +111,7 @@ func (c *Config) Clone() Config {
 		Voters:       quorum.JointConfig{clone(c.Voters[0]), clone(c.Voters[1])},
 		Learners:     clone(c.Learners),
 		LearnersNext: clone(c.LearnersNext),
+		Quorum:       c.Quorum,
 	}
 }
 
@@ -150,6 +154,7 @@ func (p *ProgressTracker) ConfState() pb.ConfState {
 		Learners:       quorum.MajorityConfig(p.Learners).Slice(),
 		LearnersNext:   quorum.MajorityConfig(p.LearnersNext).Slice(),
 		AutoLeave:      p.AutoLeave,
+		Quorum:         p.Config.Quorum,
 	}
 }
 
@@ -174,8 +179,8 @@ func (l matchAckIndexer) AckedIndex(id uint64) (quorum.Index, bool) {
 
 // Committed returns the largest log index known to be committed based on what
 // the voting members of the group have acknowledged.
-func (p *ProgressTracker) Committed() uint64 {
-	return uint64(p.Voters.CommittedIndex(matchAckIndexer(p.Progress)))
+func (p *ProgressTracker) Committed(quorum uint64) uint64 {
+	return uint64(p.Voters.CommittedIndex(matchAckIndexer(p.Progress), quorum))
 }
 
 func insertionSort(sl []uint64) {
@@ -212,7 +217,7 @@ func (p *ProgressTracker) Visit(f func(id uint64, pr *Progress)) {
 
 // QuorumActive returns true if the quorum is active from the view of the local
 // raft state machine. Otherwise, it returns false.
-func (p *ProgressTracker) QuorumActive() bool {
+func (p *ProgressTracker) QuorumActive(q uint64) bool {
 	votes := map[uint64]bool{}
 	p.Visit(func(id uint64, pr *Progress) {
 		if pr.IsLearner {
@@ -221,7 +226,7 @@ func (p *ProgressTracker) QuorumActive() bool {
 		votes[id] = pr.RecentActive
 	})
 
-	return p.Voters.VoteResult(votes) == quorum.VoteWon
+	return p.Voters.VoteResult(votes, q) == quorum.VoteWon
 }
 
 // VoterNodes returns a sorted slice of voters.
@@ -264,7 +269,7 @@ func (p *ProgressTracker) RecordVote(id uint64, v bool) {
 
 // TallyVotes returns the number of granted and rejected Votes, and whether the
 // election outcome is known.
-func (p *ProgressTracker) TallyVotes() (granted int, rejected int, _ quorum.VoteResult) {
+func (p *ProgressTracker) TallyVotes(q uint64) (granted int, rejected int, _ quorum.VoteResult) {
 	// Make sure to populate granted/rejected correctly even if the Votes slice
 	// contains members no longer part of the configuration. This doesn't really
 	// matter in the way the numbers are used (they're informational), but might
@@ -283,6 +288,6 @@ func (p *ProgressTracker) TallyVotes() (granted int, rejected int, _ quorum.Vote
 			rejected++
 		}
 	}
-	result := p.Voters.VoteResult(p.Votes)
+	result := p.Voters.VoteResult(p.Votes, q)
 	return granted, rejected, result
 }

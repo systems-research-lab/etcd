@@ -123,7 +123,7 @@ func insertionSort(sl []uint64) {
 
 // CommittedIndex computes the committed index from those supplied via the
 // provided AckedIndexer (for the active config).
-func (c MajorityConfig) CommittedIndex(l AckedIndexer) Index {
+func (c MajorityConfig) CommittedIndex(l AckedIndexer, quorum uint64) Index {
 	n := len(c)
 	if n == 0 {
 		// This plays well with joint quorums which, when one half is the zero
@@ -167,7 +167,15 @@ func (c MajorityConfig) CommittedIndex(l AckedIndexer) Index {
 	// The smallest index into the array for which the value is acked by a
 	// quorum. In other words, from the end of the slice, move n/2+1 to the
 	// left (accounting for zero-indexing).
-	pos := n - (n/2 + 1)
+	//updated by shireen
+	var pos int
+	if quorum == 0 {
+		pos = n - (n/2 + 1)
+		fmt.Sprintf("default quorum pos %[1]d\n", pos)
+	} else {
+		pos = n - int(quorum)
+		fmt.Sprintf("variable quorum pos %[1]d\n", pos)
+	}
 	return Index(srt[pos])
 }
 
@@ -175,7 +183,7 @@ func (c MajorityConfig) CommittedIndex(l AckedIndexer) Index {
 // a result indicating whether the vote is pending (i.e. neither a quorum of
 // yes/no has been reached), won (a quorum of yes has been reached), or lost (a
 // quorum of no has been reached).
-func (c MajorityConfig) VoteResult(votes map[uint64]bool) VoteResult {
+func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteResult {
 	if len(c) == 0 {
 		// By convention, the elections on an empty config win. This comes in
 		// handy with joint quorums because it'll make a half-populated joint
@@ -198,8 +206,14 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool) VoteResult {
 			ny[0]++
 		}
 	}
-
-	q := len(c)/2 + 1
+	var q int
+	if quorum == 0 {
+		q = len(c)/2 + 1
+		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
+	} else {
+		q = int(quorum)
+		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
+	}
 	if ny[1] >= q {
 		return VoteWon
 	}

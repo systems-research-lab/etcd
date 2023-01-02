@@ -80,7 +80,7 @@ func (c ConfChangeV2) EnterJoint() (autoLeave bool, ok bool) {
 	// base config (i.e. two voters are turned into learners in the process of
 	// applying the conf change). In practice, these distinctions should not
 	// matter, so we keep it simple and use Joint Consensus liberally.
-	if c.Transition != ConfChangeTransitionAuto || len(c.Changes) > 1 {
+	if (c.Transition != ConfChangeTransitionAuto || len(c.Changes) > 1) && c.Transition != ConfChangeTransitionQuorum {
 		// Use Joint Consensus.
 		var autoLeave bool
 		switch c.Transition {
