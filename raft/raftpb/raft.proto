@@ -104,7 +104,7 @@ enum ConfChangeTransition {
 	// applications that want to explicitly control the transitions, for example
 	// to use a custom payload (via the Context field).
 	ConfChangeTransitionJointExplicit = 2;
-	//added by shireen for quorum related changes
+	// Added by shireen for dynamic quorum reconfiguration.
 	ConfChangeTransitionQuorum = 3;
 }
 
@@ -191,10 +191,9 @@ message ConfChangeV2 {
 	optional ConfChangeTransition transition = 1 [(gogoproto.nullable) = false];
 	repeated ConfChangeSingle     changes =    2 [(gogoproto.nullable) = false];
 	optional bytes                context =    3;
-	optional uint64          confIndex = 4 [(gogoproto.nullable) = false];
-	optional uint64          confTerm = 5 [(gogoproto.nullable) = false];
-	optional uint64 					quorum = 6 [(gogoproto.nullable) = false];
-
+	optional uint64               confIndex = 4 [(gogoproto.nullable) = false];
+	optional uint64               confTerm = 5 [(gogoproto.nullable) = false];
+	optional uint64 					    quorum = 6 [(gogoproto.nullable) = false];
 }
 
 message ConfMetadata {

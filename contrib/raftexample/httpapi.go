@@ -16,6 +16,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -31,19 +32,81 @@ type httpKVAPI struct {
 	confChangeCV2 chan<- raftpb.ConfChangeV2
 }
 
-type data struct {
-	id  uint64
-	ip  string
-	opr uint64
+// Operation on node during dynamic quorum reconfigure.
+type dynamicQuorumOp struct {
+	Operation int    `json:"operation"` // 0: add, 1: remove
+	Url       string `json:"url"`
+	Id        uint64 `json:"id"`
 }
 
-type ConfChangeJson struct {
-	data []data `json:"data"`
-	q    uint64 `json:"q"`
+type dynamicQuorumReq struct {
+	QuorumSize uint64            `json:"quorumSize"`
+	Ops        []dynamicQuorumOp `json:"ops"`
 }
 
-type newjson struct {
-	q uint64 `json:"q"`
+func (h *httpKVAPI) handleDynamicQuorum(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Failed to read on POST (%v)\n", err)
+		http.Error(w, "Failed on POST", http.StatusBadRequest)
+		return
+	}
+
+	req := dynamicQuorumReq{}
+	if err = json.Unmarshal(body, &req); err != nil {
+		log.Printf("Failed to parse body (%v)\n", err)
+		http.Error(w, "Failed on POST", http.StatusBadRequest)
+		return
+	}
+
+	changes := make([]raftpb.ConfChangeSingle, 0, len(req.Ops))
+	for _, op := range req.Ops {
+		if op.Operation != 0 && op.Operation != 1 {
+			log.Printf("Unknown operation (%v)\n", op.Operation)
+			http.Error(w, "Failed on POST", http.StatusBadRequest)
+			return
+		}
+
+		changes = append(changes,
+			raftpb.ConfChangeSingle{
+				Type:    raftpb.ConfChangeType(op.Operation),
+				NodeID:  op.Id,
+				Context: []byte(op.Url),
+			})
+	}
+
+	h.confChangeCV2 <- raftpb.ConfChangeV2{
+		Transition: raftpb.ConfChangeTransitionQuorum,
+		Quorum:     req.QuorumSize,
+		Changes:    changes,
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *httpKVAPI) handleSingleNodeAdd(w http.ResponseWriter, r *http.Request) {
+	url, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Failed to read on POST (%v)\n", err)
+		http.Error(w, "Failed on POST", http.StatusBadRequest)
+		return
+	}
+
+	nodeId, err := strconv.ParseUint(r.RequestURI[1:], 0, 64)
+	if err != nil {
+		log.Printf("Failed to convert ID for conf change (%v)\n", err)
+		http.Error(w, "Failed on POST", http.StatusBadRequest)
+		return
+	}
+
+	h.confChangeC <- raftpb.ConfChange{
+		Type:    raftpb.ConfChangeAddNode,
+		NodeID:  nodeId,
+		Context: url,
+	}
+
+	// As above, optimistic that raft will apply the conf change
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -70,103 +133,11 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to GET", http.StatusNotFound)
 		}
 	case r.Method == "POST":
-		url, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Printf("Failed to read on POST (%v)\n", err)
-			http.Error(w, "Failed on POST", http.StatusBadRequest)
-			return
-		}
-		//added by shireen
-		if key == "/confchange" {
-			byt := []byte(url)
-
-			//var dat map[string]interface{}
-			var dat = map[string][]string{}
-
-			if err := json.Unmarshal(byt, &dat); err != nil {
-				panic(err)
-			}
-			ccv2 := raftpb.ConfChangeV2{
-				Transition: 3,
-				Changes:    nil,
-				Context:    nil,
-				ConfIndex:  0,
-				ConfTerm:   0,
-			}
-			var ips []string
-			var ids []string
-			var operations []string
-
-			for key, value := range dat {
-				if key == "q" {
-					var q uint64
-					q, err = strconv.ParseUint(value[0], 0, 64)
-					if err != nil {
-						log.Printf("Failed to convert quorum for conf change (%v)\n", err)
-						http.Error(w, "Failed on POST", http.StatusBadRequest)
-						return
-					}
-					ccv2.Quorum = q
-				} else if key == "ip" {
-					ips = value
-				} else if key == "id" {
-					ids = value
-				} else if key == "opr" {
-					operations = value
-				}
-			}
-			var ccsA []raftpb.ConfChangeSingle
-			if len(operations) == len(ips) && len(ips) == len(ids) {
-				j := 0
-				for range ids {
-					var ccs raftpb.ConfChangeSingle
-					var opr uint64
-					opr, err = strconv.ParseUint(operations[j], 0, 64)
-					if err != nil {
-						log.Printf("Failed to convert operation for conf change (%v)\n", err)
-						http.Error(w, "Failed on POST", http.StatusBadRequest)
-						return
-					}
-					if opr == 0 {
-						ccs.Type = raftpb.ConfChangeAddNode
-					} else if opr == 1 {
-						ccs.Type = raftpb.ConfChangeRemoveNode
-					}
-					var id uint64
-					id, err = strconv.ParseUint(ids[j], 0, 64)
-					if err != nil {
-						log.Printf("Failed to convert ID for conf change (%v)\n", err)
-						http.Error(w, "Failed on POST", http.StatusBadRequest)
-						return
-					}
-					ccs.NodeID = id
-					ccs.Context = []byte(ips[j])
-					ccsA = append(ccsA, ccs)
-					j++
-				}
-				ccv2.Changes = ccsA
-			} else {
-				panic("length not equal for ips and ids")
-			}
-
-			h.confChangeCV2 <- ccv2
-		} else {
-			nodeId, err := strconv.ParseUint(key[1:], 0, 64)
-			if err != nil {
-				log.Printf("Failed to convert ID for conf change (%v)\n", err)
-				http.Error(w, "Failed on POST", http.StatusBadRequest)
-				return
-			}
-
-			cc := raftpb.ConfChange{
-				Type:    raftpb.ConfChangeAddNode,
-				NodeID:  nodeId,
-				Context: url,
-			}
-			h.confChangeC <- cc
-
-			// As above, optimistic that raft will apply the conf change
-			w.WriteHeader(http.StatusNoContent)
+		switch key {
+		case "/dynamic-quorum": // Add by shireen for dynamic quorum reconfiguration
+			h.handleDynamicQuorum(w, r)
+		default: // Add a single node
+			h.handleSingleNodeAdd(w, r)
 		}
 	case r.Method == "DELETE":
 		nodeId, err := strconv.ParseUint(key[1:], 0, 64)

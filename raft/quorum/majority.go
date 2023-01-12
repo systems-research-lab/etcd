@@ -167,7 +167,7 @@ func (c MajorityConfig) CommittedIndex(l AckedIndexer, quorum uint64) Index {
 	// The smallest index into the array for which the value is acked by a
 	// quorum. In other words, from the end of the slice, move n/2+1 to the
 	// left (accounting for zero-indexing).
-	//updated by shireen
+	// updated by shireen
 	var pos int
 	if quorum == 0 {
 		pos = n - (n/2 + 1)
