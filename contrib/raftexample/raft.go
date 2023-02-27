@@ -45,7 +45,6 @@ type commit struct {
 // A key-value stream backed by raft
 type raftNode struct {
 	proposeC      <-chan string              // proposed messages (k,v)
-	confChangeC   <-chan raftpb.ConfChange   // proposed cluster config changes
 	confChangeCV2 <-chan raftpb.ConfChangeV2 // proposed cluster config changes, added by shireen
 	commitC       chan<- *commit             // entries committed to log (k,v)
 	errorC        chan<- error               // errors from raft session
@@ -86,7 +85,7 @@ var defaultSnapshotCount uint64 = 10000
 // commit channel, followed by a nil message (to indicate the channel is
 // current), then new log entries. To shutdown, close proposeC and read errorC.
 func newRaftNode(id int, peers map[int]string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan string,
-	confChangeC <-chan raftpb.ConfChange, confChangeCV2 <-chan raftpb.ConfChangeV2) (
+	confChangeCV2 <-chan raftpb.ConfChangeV2) (
 	<-chan *commit, <-chan error, <-chan *snap.Snapshotter) {
 
 	commitC := make(chan *commit)
@@ -94,7 +93,6 @@ func newRaftNode(id int, peers map[int]string, join bool, getSnapshot func() ([]
 
 	rc := &raftNode{
 		proposeC:      proposeC,
-		confChangeC:   confChangeC,
 		confChangeCV2: confChangeCV2,
 		commitC:       commitC,
 		errorC:        errorC,
@@ -167,7 +165,7 @@ func (rc *raftNode) publishEntries(ents []raftpb.Entry, currentConfIndex uint64)
 			}
 			s := string(ents[i].Data)
 			data = append(data, s)
-		case raftpb.EntryConfChange:
+		case raftpb.EntryConfChange: // should only be used for boostrap conf entries
 			if ents[i].Index > currentConfIndex {
 				var cc raftpb.ConfChange
 				cc.Unmarshal(ents[i].Data)
@@ -183,7 +181,6 @@ func (rc *raftNode) publishEntries(ents []raftpb.Entry, currentConfIndex uint64)
 						return nil, false
 					}
 					rc.transport.RemovePeer(types.ID(cc.NodeID))
-
 				}
 			}
 		case raftpb.EntryConfChangeV2:
@@ -199,12 +196,14 @@ func (rc *raftNode) publishEntries(ents []raftpb.Entry, currentConfIndex uint64)
 						if len(ccs.Context) > 0 {
 							rc.transport.AddPeer(types.ID(ccs.NodeID), []string{string(ccs.Context)})
 						}
+						log.Printf("Committed: add peer %v\n", ccs.NodeID)
 					case raftpb.ConfChangeRemoveNode:
 						if ccs.NodeID == uint64(rc.id) {
 							log.Println("I've been removed from the cluster! Shutting down.")
 							return nil, false
 						}
 						rc.transport.RemovePeer(types.ID(ccs.NodeID))
+						log.Printf("Committed: remove peer %v\n", ccs.NodeID)
 					}
 				}
 			}
@@ -228,24 +227,21 @@ func (rc *raftNode) publishEntries(ents []raftpb.Entry, currentConfIndex uint64)
 	return applyDoneC, true
 }
 
-// apply configuration change when entries are added.
-func (rc *raftNode) applyConfigurationAddEntries(ents []raftpb.Entry, currentConfIndex uint64) (bool, uint64) {
+// apply configuration change immediately when entries are added.
+func (rc *raftNode) applyConfChange(ents []raftpb.Entry, currentConfIndex uint64) (uint64, bool) {
 	if len(ents) == 0 {
-		return true, 0
+		return 0, true
 	}
-	var i int = 32
-	localconfindex := uint64(i)
-	localconfindex = 0
-	log.Printf("%d entries leng", len(ents))
+
+	var newConfIndex uint64 = 0
 	for i := range ents {
-		e := &ents[i]
-		if e.Type == raftpb.EntryConfChange {
+		switch ents[i].Type {
+		case raftpb.EntryConfChange: // should only be used for boostrap conf entries
 			if ents[i].Index > currentConfIndex {
-				log.Printf("%d entries leng EntryConfChange", len(ents))
 				var cc raftpb.ConfChange
-				cc.Unmarshal(e.Data)
-				rc.confState = *rc.node.ApplyConfChangeConfAddEntry(cc, e.Index, e.Term)
-				localconfindex = e.Index
+				cc.Unmarshal(ents[i].Data)
+				rc.confState = *rc.node.ApplyConfChangeConfAddEntry(cc, ents[i].Index, ents[i].Term)
+				newConfIndex = ents[i].Index
 				switch cc.Type {
 				case raftpb.ConfChangeAddNode:
 					if len(cc.Context) > 0 {
@@ -254,18 +250,17 @@ func (rc *raftNode) applyConfigurationAddEntries(ents []raftpb.Entry, currentCon
 				case raftpb.ConfChangeRemoveNode:
 					if cc.NodeID == uint64(rc.id) {
 						log.Println("I've been removed from the cluster! Shutting down.")
-						return false, 0
+						return 0, false
 					}
 					rc.transport.RemovePeer(types.ID(cc.NodeID))
 				}
 			}
-		} else if e.Type == raftpb.EntryConfChangeV2 {
+		case raftpb.EntryConfChangeV2:
 			if ents[i].Index > currentConfIndex {
-				log.Printf("%d entries leng EntryConfChange", len(ents))
 				var cc raftpb.ConfChangeV2
-				cc.Unmarshal(e.Data)
-				rc.confState = *rc.node.ApplyConfChangeConfAddEntry(cc, e.Index, e.Term)
-				localconfindex = e.Index
+				cc.Unmarshal(ents[i].Data)
+				rc.confState = *rc.node.ApplyConfChangeConfAddEntry(cc, ents[i].Index, ents[i].Term)
+				newConfIndex = ents[i].Index
 				for j := range cc.Changes {
 					ccs := &cc.Changes[j]
 					switch ccs.Type {
@@ -273,20 +268,24 @@ func (rc *raftNode) applyConfigurationAddEntries(ents []raftpb.Entry, currentCon
 						if len(ccs.Context) > 0 {
 							rc.transport.AddPeer(types.ID(ccs.NodeID), []string{string(ccs.Context)})
 						}
+						log.Printf("added: add peer %v\n", ccs.NodeID)
 					case raftpb.ConfChangeRemoveNode:
 						if ccs.NodeID == uint64(rc.id) {
 							log.Println("I've been removed from the cluster! Shutting down.")
-							return false, 0
+							return 0, false
 						}
 						rc.transport.RemovePeer(types.ID(ccs.NodeID))
+						log.Printf("added: remove peer %v\n", ccs.NodeID)
 					}
 				}
 			}
-		} else {
-			log.Printf("%d entries leng else ", len(ents))
+		case raftpb.EntryNormal:
+			continue
+		default:
+			log.Fatalf("Unsupported conf change type: %s", ents[i].Type)
 		}
 	}
-	return true, localconfindex
+	return newConfIndex, true
 }
 
 func (rc *raftNode) loadSnapshot() *raftpb.Snapshot {
@@ -504,9 +503,7 @@ func (rc *raftNode) serveChannels() {
 
 	// send proposals over raft
 	go func() {
-		confChangeCount := uint64(0)
-
-		for rc.proposeC != nil && rc.confChangeC != nil && rc.confChangeCV2 != nil {
+		for rc.proposeC != nil && rc.confChangeCV2 != nil {
 			select {
 			case prop, ok := <-rc.proposeC:
 				if !ok {
@@ -515,20 +512,10 @@ func (rc *raftNode) serveChannels() {
 					// blocks until accepted by raft state machine
 					rc.node.Propose(context.TODO(), []byte(prop))
 				}
-
-			case cc, ok := <-rc.confChangeC:
-				if !ok {
-					rc.confChangeC = nil
-				} else {
-					confChangeCount++
-					cc.ID = confChangeCount
-					rc.node.ProposeConfChange(context.TODO(), cc)
-				}
 			case ccv2, ok := <-rc.confChangeCV2:
 				if !ok {
 					rc.confChangeCV2 = nil
 				} else {
-					confChangeCount++
 					rc.node.ProposeConfChange(context.TODO(), ccv2)
 				}
 			}
@@ -545,19 +532,19 @@ func (rc *raftNode) serveChannels() {
 
 		// store raft entries to wal, then publish over commit channel
 		case rd := <-rc.node.Ready():
-			//added by shireen
-			ok, localconfindex := rc.applyConfigurationAddEntries(rd.Entries, rd.CurrentConfIndex)
+			newConfIndex, ok := rc.applyConfChange(rd.Entries, rd.CurrentConfMetadata.Index)
 			if !ok {
 				rc.stop()
 				return
 			}
-			//added by shireen for the storing the prev configuration for restore corner case
+
 			if !raft.IsEmptyConfMetadata(rd.CurrentConfMetadata) {
 				rc.wal.SaveWithConfState(rd.HardState, rd.Entries, rc.raftStorage.GetCurrentConfState())
 				rc.raftStorage.SetConfState(rd.CurrentConfMetadata)
 			} else {
 				rc.wal.Save(rd.HardState, rd.Entries)
 			}
+
 			if !raft.IsEmptySnap(rd.Snapshot) {
 				rc.saveSnap(rd.Snapshot)
 				rc.raftStorage.ApplySnapshot(rd.Snapshot)
@@ -565,15 +552,16 @@ func (rc *raftNode) serveChannels() {
 			}
 			rc.raftStorage.Append(rd.Entries)
 			rc.transport.Send(rd.Messages)
-			if localconfindex == 0 {
-				applyDoneC, ok := rc.publishEntries(rc.entriesToApply(rd.CommittedEntries), rd.CurrentConfIndex)
+
+			if newConfIndex == 0 {
+				applyDoneC, ok := rc.publishEntries(rc.entriesToApply(rd.CommittedEntries), rd.CurrentConfMetadata.Index)
 				if !ok {
 					rc.stop()
 					return
 				}
 				rc.maybeTriggerSnapshot(applyDoneC)
 			} else {
-				applyDoneC, ok := rc.publishEntries(rc.entriesToApply(rd.CommittedEntries), localconfindex)
+				applyDoneC, ok := rc.publishEntries(rc.entriesToApply(rd.CommittedEntries), newConfIndex)
 				if !ok {
 					rc.stop()
 					return

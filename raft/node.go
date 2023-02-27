@@ -90,7 +90,6 @@ type Ready struct {
 
 	//added by shireen
 	//maintaining the current configuration index
-	CurrentConfIndex    uint64
 	CurrentConfMetadata pb.ConfMetadata
 }
 
@@ -526,6 +525,24 @@ func (n *node) ApplyConfChange(cc pb.ConfChangeI) *pb.ConfState {
 	return &cs
 }
 
+// added by shireen
+func (n *node) ApplyConfChangeConfAddEntry(cc pb.ConfChangeI, confIndex uint64, confTerm uint64) *pb.ConfState {
+	var cs pb.ConfState
+	var ccv2 pb.ConfChangeV2
+	ccv2 = cc.AsV2()
+	ccv2.ConfIndex = confIndex
+	ccv2.ConfTerm = confTerm
+	select {
+	case n.confc <- ccv2:
+	case <-n.done:
+	}
+	select {
+	case cs = <-n.confstatec:
+	case <-n.done:
+	}
+	return &cs
+}
+
 func (n *node) Status() Status {
 	c := make(chan Status)
 	select {
@@ -567,11 +584,9 @@ func (n *node) ReadIndex(ctx context.Context, rctx []byte) error {
 
 func newReady(r *raft, prevSoftSt *SoftState, prevHardSt pb.HardState) Ready {
 	rd := Ready{
-		Entries:          r.raftLog.unstableEntries(),
-		CommittedEntries: r.raftLog.nextEnts(),
-		Messages:         r.msgs,
-		//added by shireen for restore
-		CurrentConfIndex:    r.currentConfIndex,
+		Entries:             r.raftLog.unstableEntries(),
+		CommittedEntries:    r.raftLog.nextEnts(),
+		Messages:            r.msgs,
 		CurrentConfMetadata: r.currentConfMetadata,
 	}
 	//r.logger.Infof("raft.node: r.currentConfMetadata index %d term %x", r.currentConfMetadata.Index, r.currentConfMetadata.Term)
@@ -600,24 +615,6 @@ func MustSync(st, prevst pb.HardState, entsnum int) bool {
 	// votedFor
 	// log entries[]
 	return entsnum != 0 || st.Vote != prevst.Vote || st.Term != prevst.Term
-}
-
-//added by shireen
-func (n *node) ApplyConfChangeConfAddEntry(cc pb.ConfChangeI, confIndex uint64, confTerm uint64) *pb.ConfState {
-	var cs pb.ConfState
-	var ccv2 pb.ConfChangeV2
-	ccv2 = cc.AsV2()
-	ccv2.ConfIndex = confIndex
-	ccv2.ConfTerm = confTerm
-	select {
-	case n.confc <- ccv2:
-	case <-n.done:
-	}
-	select {
-	case cs = <-n.confstatec:
-	case <-n.done:
-	}
-	return &cs
 }
 
 // IsEmptyConfMetadata returns true if the given confmetadata is empty.

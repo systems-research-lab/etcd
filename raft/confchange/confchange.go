@@ -38,9 +38,11 @@ type Changer struct {
 // config is empty and initializes it with a copy of the incoming (=left)
 // majority config. That is, it transitions from
 //
-//     (1 2 3)&&()
+//	(1 2 3)&&()
+//
 // to
-//     (1 2 3)&&(1 2 3).
+//
+//	(1 2 3)&&(1 2 3).
 //
 // The supplied changes are then applied to the incoming majority config,
 // resulting in a joint configuration that in terms of the Raft thesis[1]
@@ -116,6 +118,81 @@ func (c Changer) LeaveJoint() (tracker.Config, tracker.ProgressMap, error) {
 		if !isVoter && !isLearner {
 			delete(prs, id)
 		}
+	}
+	*outgoingPtr(&cfg.Voters) = nil
+	cfg.AutoLeave = false
+
+	return checkAndReturn(cfg, prs)
+}
+
+// EnterSplit enters a joint consensus for split. In the joint consensus,
+// the config containing current node is marked incoming one and the other
+// one will be outgoing.
+// As an example, transit from (1,2,3) into (1,2)&(3):
+// 1. either (1,2) or (3) will exist in ccs and should be marked as pb.ConfChangeUpdateNode,
+// 2. for 1 and 2, incoming is (1,2) and outgoing is (3),
+// 3. for 3, incoming is (3) and outgoing is (1,2).
+func (c Changer) EnterSplit(autoLeave bool, currId uint64, ccs ...pb.ConfChangeSingle) (
+	tracker.Config, tracker.ProgressMap, error) {
+	cfg, prs, err := c.checkAndCopy()
+	if err != nil {
+		return c.err(err)
+	}
+	if joint(cfg) {
+		err := errors.New("config is already joint")
+		return c.err(err)
+	}
+	if len(cfg.Voters[0]) == 0 {
+		// We allow adding nodes to an empty config for convenience (testing and
+		// bootstrap), but you can't enter a joint state.
+		err := errors.New("can't make a zero-voter config joint")
+		return c.err(err)
+	}
+
+	// remove nodes from cfg.Voters[0] and add to cfg.Voters[1]
+	swap := false
+	*outgoingPtr(&cfg.Voters) = quorum.MajorityConfig{}
+	for _, cc := range ccs {
+		if _, ok := prs[cc.NodeID]; !ok {
+			return c.err(fmt.Errorf("unknown node id to split: %v", cc.NodeID))
+		}
+
+		if currId == cc.NodeID {
+			swap = true
+		}
+
+		delete(incoming(cfg.Voters), cc.NodeID)
+		outgoing(cfg.Voters)[cc.NodeID] = struct{}{}
+	}
+	if swap {
+		*incomingPtr(&cfg.Voters), *outgoingPtr(&cfg.Voters) = outgoing(cfg.Voters), incoming(cfg.Voters)
+	}
+
+	if err := c.apply(&cfg, prs, ccs...); err != nil {
+		return c.err(err)
+	}
+
+	cfg.AutoLeave = autoLeave
+	return checkAndReturn(cfg, prs)
+}
+
+// LeaveSplit transit out of joint consensus.
+func (c Changer) LeaveSplit() (tracker.Config, tracker.ProgressMap, error) {
+	cfg, prs, err := c.checkAndCopy()
+	if err != nil {
+		return c.err(err)
+	}
+	if !joint(cfg) {
+		err := errors.New("can't leave a non-joint config")
+		return c.err(err)
+	}
+	if len(outgoing(cfg.Voters)) == 0 {
+		err := fmt.Errorf("configuration is not joint: %v", cfg)
+		return c.err(err)
+	}
+
+	for id := range outgoing(cfg.Voters) {
+		delete(prs, id)
 	}
 	*outgoingPtr(&cfg.Voters) = nil
 	cfg.AutoLeave = false
@@ -408,6 +485,7 @@ func joint(cfg tracker.Config) bool {
 
 func incoming(voters quorum.JointConfig) quorum.MajorityConfig      { return voters[0] }
 func outgoing(voters quorum.JointConfig) quorum.MajorityConfig      { return voters[1] }
+func incomingPtr(voters *quorum.JointConfig) *quorum.MajorityConfig { return &voters[0] }
 func outgoingPtr(voters *quorum.JointConfig) *quorum.MajorityConfig { return &voters[1] }
 
 // Describe prints the type and NodeID of the configuration changes as a

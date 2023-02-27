@@ -28,7 +28,6 @@ import (
 // Handler for a http based key-value store backed by raft
 type httpKVAPI struct {
 	store         *kvstore
-	confChangeC   chan<- raftpb.ConfChange
 	confChangeCV2 chan<- raftpb.ConfChangeV2
 }
 
@@ -84,6 +83,59 @@ func (h *httpKVAPI) handleDynamicQuorum(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type splitQuorumReq struct {
+	Ids       []uint64 `json:"ids"`       // id of nodes to split from current config
+	AutoLeave *bool    `json:"autoLeave"` // automatically leave the joint consensus when appropriate, default: true
+	Leave     bool     `json:"leave"`     // true if this request is to leave the joint consensus, default: false
+}
+
+func (h *httpKVAPI) handleSplitQuorum(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Failed to read on POST (%v)\n", err)
+		http.Error(w, "Failed on POST", http.StatusBadRequest)
+		return
+	}
+
+	req := splitQuorumReq{}
+	if err = json.Unmarshal(body, &req); err != nil {
+		log.Printf("Failed to parse body (%v)\n", err)
+		http.Error(w, "Failed on POST", http.StatusBadRequest)
+		return
+	}
+
+	if req.Leave { // leave joint consensus for split
+		h.confChangeCV2 <- raftpb.ConfChangeV2{
+			Transition: raftpb.ConfChangeTransitionSplitLeave,
+		}
+	} else { // enter joint consensus for split
+		if len(req.Ids) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		changes := make([]raftpb.ConfChangeSingle, 0, len(req.Ids))
+		for _, id := range req.Ids {
+			changes = append(changes,
+				raftpb.ConfChangeSingle{
+					Type:    raftpb.ConfChangeUpdateNode,
+					NodeID:  id,
+					Context: nil,
+				})
+		}
+
+		transition := raftpb.ConfChangeTransitionSplitImplicit
+		if req.AutoLeave != nil && !*req.AutoLeave {
+			transition = raftpb.ConfChangeTransitionSplitExplicit
+		}
+
+		h.confChangeCV2 <- raftpb.ConfChangeV2{
+			Transition: transition,
+			Changes:    changes,
+		}
+	}
+}
+
 func (h *httpKVAPI) handleSingleNodeAdd(w http.ResponseWriter, r *http.Request) {
 	url, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -99,10 +151,9 @@ func (h *httpKVAPI) handleSingleNodeAdd(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	h.confChangeC <- raftpb.ConfChange{
-		Type:    raftpb.ConfChangeAddNode,
-		NodeID:  nodeId,
-		Context: url,
+	h.confChangeCV2 <- raftpb.ConfChangeV2{
+		Transition: raftpb.ConfChangeTransitionAuto,
+		Changes:    []raftpb.ConfChangeSingle{{Type: raftpb.ConfChangeAddNode, NodeID: nodeId, Context: url}},
 	}
 
 	// As above, optimistic that raft will apply the conf change
@@ -136,6 +187,8 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		switch key {
 		case "/dynamic-quorum": // Add by shireen for dynamic quorum reconfiguration
 			h.handleDynamicQuorum(w, r)
+		case "/split-quorum": // Split quorum into two independent ones
+			h.handleSplitQuorum(w, r)
 		default: // Add a single node
 			h.handleSingleNodeAdd(w, r)
 		}
@@ -147,11 +200,10 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		cc := raftpb.ConfChange{
-			Type:   raftpb.ConfChangeRemoveNode,
-			NodeID: nodeId,
+		h.confChangeCV2 <- raftpb.ConfChangeV2{
+			Transition: raftpb.ConfChangeTransitionAuto,
+			Changes:    []raftpb.ConfChangeSingle{{Type: raftpb.ConfChangeRemoveNode, NodeID: nodeId}},
 		}
-		h.confChangeC <- cc
 
 		// As above, optimistic that raft will apply the conf change
 		w.WriteHeader(http.StatusNoContent)
@@ -171,7 +223,6 @@ func serveHttpKVAPI(kv *kvstore, port int, confChangeC chan<- raftpb.ConfChange,
 		Addr: ":" + strconv.Itoa(port),
 		Handler: &httpKVAPI{
 			store:         kv,
-			confChangeC:   confChangeC,
 			confChangeCV2: confChangeCV2,
 		},
 	}

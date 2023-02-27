@@ -80,7 +80,10 @@ func (c ConfChangeV2) EnterJoint() (autoLeave bool, ok bool) {
 	// base config (i.e. two voters are turned into learners in the process of
 	// applying the conf change). In practice, these distinctions should not
 	// matter, so we keep it simple and use Joint Consensus liberally.
-	if (c.Transition != ConfChangeTransitionAuto || len(c.Changes) > 1) && c.Transition != ConfChangeTransitionQuorum {
+
+	if (c.Transition == ConfChangeTransitionAuto && len(c.Changes) > 1) ||
+		c.Transition == ConfChangeTransitionJointImplicit ||
+		c.Transition == ConfChangeTransitionJointExplicit {
 		// Use Joint Consensus.
 		var autoLeave bool
 		switch c.Transition {
@@ -104,6 +107,21 @@ func (c ConfChangeV2) LeaveJoint() bool {
 	// NB: c is already a copy.
 	c.Context = nil
 	return proto.Equal(&c, &ConfChangeV2{})
+}
+
+func (c ConfChangeV2) EnterSplit() (autoLeave bool, ok bool) {
+	switch c.Transition {
+	case ConfChangeTransitionSplitImplicit:
+		return true, true
+	case ConfChangeTransitionSplitExplicit:
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+func (c ConfChangeV2) LeaveSplit() bool {
+	return c.Transition == ConfChangeTransitionSplitLeave
 }
 
 // ConfChangesFromString parses a Space-delimited sequence of operations into a

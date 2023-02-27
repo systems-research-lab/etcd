@@ -963,6 +963,56 @@ func (w *WAL) Save(st raftpb.HardState, ents []raftpb.Entry) error {
 	return w.cut()
 }
 
+// added by shireen for restore prev conf corner case
+func (w *WAL) savePrevConfState(s *raftpb.ConfMetadata) error {
+	if raft.IsEmptyConfMetadata(*s) {
+		return nil
+	}
+	w.prevcm = *s
+	b := pbutil.MustMarshal(s)
+	rec := &walpb.Record{Type: prevconfType, Data: b}
+	return w.encoder.encode(rec)
+}
+
+func (w *WAL) SaveWithConfState(st raftpb.HardState, ents []raftpb.Entry, prevconf raftpb.ConfMetadata) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// short cut, do not call sync
+	if raft.IsEmptyHardState(st) && len(ents) == 0 {
+		return nil
+	}
+	// doubt about it ??
+	mustSync := raft.MustSync(st, w.state, len(ents))
+
+	// TODO(xiangli): no more reference operator
+	for i := range ents {
+		if err := w.saveEntry(&ents[i]); err != nil {
+			return err
+		}
+	}
+	if err := w.saveState(&st); err != nil {
+		return err
+	}
+
+	if err := w.savePrevConfState(&prevconf); err != nil {
+		return err
+	}
+
+	curOff, err := w.tail().Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	if curOff < SegmentSizeBytes {
+		if mustSync {
+			return w.sync()
+		}
+		return nil
+	}
+
+	return w.cut()
+}
+
 func (w *WAL) SaveSnapshot(e walpb.Snapshot) error {
 	if err := walpb.ValidateSnapshotForWrite(&e); err != nil {
 		return err
@@ -1021,52 +1071,3 @@ func closeAll(lg *zap.Logger, rcs ...io.ReadCloser) error {
 	return errors.New(strings.Join(stringArr, ", "))
 }
 
-// added by shireen for restore prev conf corner case
-func (w *WAL) savePrevConfState(s *raftpb.ConfMetadata) error {
-	if raft.IsEmptyConfMetadata(*s) {
-		return nil
-	}
-	w.prevcm = *s
-	b := pbutil.MustMarshal(s)
-	rec := &walpb.Record{Type: prevconfType, Data: b}
-	return w.encoder.encode(rec)
-}
-
-func (w *WAL) SaveWithConfState(st raftpb.HardState, ents []raftpb.Entry, prevConf raftpb.ConfMetadata) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	// short cut, do not call sync
-	if raft.IsEmptyHardState(st) && len(ents) == 0 {
-		return nil
-	}
-	// doubt about it ??
-	mustSync := raft.MustSync(st, w.state, len(ents))
-
-	// TODO(xiangli): no more reference operator
-	for i := range ents {
-		if err := w.saveEntry(&ents[i]); err != nil {
-			return err
-		}
-	}
-	if err := w.saveState(&st); err != nil {
-		return err
-	}
-
-	if err := w.savePrevConfState(&prevConf); err != nil {
-		return err
-	}
-
-	curOff, err := w.tail().Seek(0, io.SeekCurrent)
-	if err != nil {
-		return err
-	}
-	if curOff < SegmentSizeBytes {
-		if mustSync {
-			return w.sync()
-		}
-		return nil
-	}
-
-	return w.cut()
-}

@@ -315,7 +315,6 @@ type raft struct {
 	pendingReadIndexMessages []pb.Message
 
 	//for applying configuration change during restore
-	currentConfIndex    uint64
 	currentConfMetadata pb.ConfMetadata
 }
 
@@ -587,10 +586,7 @@ func (r *raft) advance(rd Ready) {
 	}
 
 	if !IsEmptyConfMetadata(rd.CurrentConfMetadata) {
-		if r.currentConfMetadata.Index == rd.CurrentConfMetadata.Index {
-			r.logger.Infof("CurrentConfMetadata in advance")
-			r.currentConfMetadata.Index = 0
-		}
+		r.currentConfMetadata = pb.ConfMetadata{}
 	}
 }
 
@@ -1538,7 +1534,7 @@ func (r *raft) handleAppendEntries(m pb.Message) {
 	}
 }
 
-//added by shireen for restoring the prv conf
+// added by shireen for restoring the prv conf
 func (r *raft) restorePreviousConf(currentConf pb.ConfMetadata, prevConf pb.ConfMetadata) bool {
 	r.logger.Infof("shireen in restorePreviousConf")
 	if currentConf.Index <= r.raftLog.committed {
@@ -1727,16 +1723,6 @@ func (r *raft) promotable() bool {
 func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 	r.logger.Infof("shireen in applyConfChange")
 
-	//added by shireen for confIndex changes
-	r.currentConfIndex = cc.ConfIndex
-	r.currentConfMetadata.Term = cc.ConfTerm
-	r.currentConfMetadata.Index = cc.ConfIndex
-
-	if cc.Quorum == 1000 {
-		cc.Quorum = 0
-	}
-	r.logger.Infof("applyConfChange %d, %d and r.currentConfIndex %d", r.currentConfMetadata.Index, r.currentConfMetadata.Term, r.currentConfIndex)
-
 	cfg, prs, err := func() (tracker.Config, tracker.ProgressMap, error) {
 		changer := confchange.Changer{
 			Tracker:   r.prs,
@@ -1747,6 +1733,10 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 			return changer.LeaveJoint()
 		} else if autoLeave, ok := cc.EnterJoint(); ok {
 			return changer.EnterJoint(autoLeave, cc.Changes...)
+		} else if autoLeave, ok = cc.EnterSplit(); ok {
+			return changer.EnterSplit(autoLeave, r.id, cc.Changes...)
+		} else if cc.LeaveSplit() {
+			return changer.LeaveSplit()
 		}
 		return changer.Simple(cc.Changes...)
 	}()
@@ -1755,8 +1745,13 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 		// TODO(tbg): return the error to the caller.
 		panic(err)
 	}
+
 	//added by shireen for conf change restore corner case
+	r.currentConfMetadata.Term = cc.ConfTerm
+	r.currentConfMetadata.Index = cc.ConfIndex
 	r.currentConfMetadata.ConfState = r.switchToConfig(cfg, prs)
+	r.logger.Infof("applyConfChange entry at term %d and index %d ",
+		r.currentConfMetadata.Index, r.currentConfMetadata.Term)
 
 	return r.currentConfMetadata.ConfState
 }
@@ -1768,7 +1763,6 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 //
 // The inputs usually result from restoring a ConfState or applying a ConfChange.
 func (r *raft) switchToConfig(cfg tracker.Config, prs tracker.ProgressMap) pb.ConfState {
-	r.logger.Infof("shireen in switchToConfig")
 	r.prs.Config = cfg
 	r.prs.Progress = prs
 

@@ -106,6 +106,12 @@ enum ConfChangeTransition {
 	ConfChangeTransitionJointExplicit = 2;
 	// Added by shireen for dynamic quorum reconfiguration.
 	ConfChangeTransitionQuorum = 3;
+	// Use joint consensus to split and leave automatically when entering entry is committed
+	ConfChangeTransitionSplitImplicit = 4;
+	// Use joint consensus to split and leave when requested after entering entry is committed
+	ConfChangeTransitionSplitExplicit = 5;
+	// Leave joint consensus for split
+	ConfChangeTransitionSplitLeave = 6;
 }
 
 message ConfState {
