@@ -31,6 +31,8 @@ type Config struct {
 	// this is possible. If false, the configuration will be joint until the
 	// application initiates the transition manually.
 	AutoLeave bool
+	// ToSplit is true if the joint configuration is for split.
+	ToSplit bool
 	// Learners is a set of IDs corresponding to the learners active in the
 	// current configuration.
 	//
@@ -154,6 +156,7 @@ func (p *ProgressTracker) ConfState() pb.ConfState {
 		Learners:       quorum.MajorityConfig(p.Learners).Slice(),
 		LearnersNext:   quorum.MajorityConfig(p.LearnersNext).Slice(),
 		AutoLeave:      p.AutoLeave,
+		ToSplit:        p.ToSplit,
 		Quorum:         p.Config.Quorum,
 	}
 }

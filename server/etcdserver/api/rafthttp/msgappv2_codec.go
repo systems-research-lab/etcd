@@ -65,6 +65,7 @@ type msgAppV2Encoder struct {
 	w  io.Writer
 	fs *stats.FollowerStats
 
+	epoch     uint64
 	term      uint64
 	index     uint64
 	buf       []byte
@@ -90,7 +91,8 @@ func (enc *msgAppV2Encoder) encode(m *raftpb.Message) error {
 		if _, err := enc.w.Write(enc.uint8buf); err != nil {
 			return err
 		}
-	case enc.index == m.Index && enc.term == m.LogTerm && m.LogTerm == m.Term:
+	case enc.index == m.Index && enc.epoch == m.Epoch && enc.term == m.LogTerm &&
+		m.LogTerm == m.Term:
 		enc.uint8buf[0] = msgTypeAppEntries
 		if _, err := enc.w.Write(enc.uint8buf); err != nil {
 			return err
@@ -141,6 +143,7 @@ func (enc *msgAppV2Encoder) encode(m *raftpb.Message) error {
 
 		enc.term = m.Term
 		enc.index = m.Index
+		enc.epoch = m.Epoch
 		if l := len(m.Entries); l > 0 {
 			enc.index = m.Entries[l-1].Index
 		}
@@ -153,6 +156,7 @@ type msgAppV2Decoder struct {
 	r             io.Reader
 	local, remote types.ID
 
+	epoch     uint64
 	term      uint64
 	index     uint64
 	buf       []byte
@@ -188,6 +192,7 @@ func (dec *msgAppV2Decoder) decode() (raftpb.Message, error) {
 			Type:    raftpb.MsgApp,
 			From:    uint64(dec.remote),
 			To:      uint64(dec.local),
+			Epoch:   dec.epoch,
 			Term:    dec.term,
 			LogTerm: dec.term,
 			Index:   dec.index,
@@ -236,6 +241,7 @@ func (dec *msgAppV2Decoder) decode() (raftpb.Message, error) {
 		}
 		pbutil.MustUnmarshal(&m, buf)
 
+		dec.epoch = m.Epoch
 		dec.term = m.Term
 		dec.index = m.Index
 		if l := len(m.Entries); l > 0 {

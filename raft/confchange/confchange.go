@@ -173,6 +173,7 @@ func (c Changer) EnterSplit(autoLeave bool, currId uint64, ccs ...pb.ConfChangeS
 	}
 
 	cfg.AutoLeave = autoLeave
+	cfg.ToSplit = true
 	return checkAndReturn(cfg, prs)
 }
 
@@ -183,11 +184,11 @@ func (c Changer) LeaveSplit() (tracker.Config, tracker.ProgressMap, error) {
 		return c.err(err)
 	}
 	if !joint(cfg) {
-		err := errors.New("can't leave a non-joint config")
+		err := errors.New("can't leave a non-split-joint config")
 		return c.err(err)
 	}
 	if len(outgoing(cfg.Voters)) == 0 {
-		err := fmt.Errorf("configuration is not joint: %v", cfg)
+		err := fmt.Errorf("configuration is not split joint : %v", cfg)
 		return c.err(err)
 	}
 
@@ -195,8 +196,9 @@ func (c Changer) LeaveSplit() (tracker.Config, tracker.ProgressMap, error) {
 		delete(prs, id)
 	}
 	*outgoingPtr(&cfg.Voters) = nil
-	cfg.AutoLeave = false
 
+	cfg.AutoLeave = false
+	cfg.ToSplit = false
 	return checkAndReturn(cfg, prs)
 }
 
@@ -243,6 +245,7 @@ func (c Changer) apply(cfg *tracker.Config, prs tracker.ProgressMap, ccs ...pb.C
 		case pb.ConfChangeRemoveNode:
 			c.remove(cfg, prs, cc.NodeID)
 		case pb.ConfChangeUpdateNode:
+		case pb.ConfChangeSplitNode:
 		default:
 			return fmt.Errorf("unexpected conf type %d", cc.Type)
 		}

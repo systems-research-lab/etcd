@@ -94,7 +94,7 @@ type Ready struct {
 }
 
 func isHardStateEqual(a, b pb.HardState) bool {
-	return a.Term == b.Term && a.Vote == b.Vote && a.Commit == b.Commit
+	return a.Term == b.Term && a.Vote == b.Vote && a.Commit == b.Commit && a.Epoch == b.Epoch
 }
 
 // IsEmptyHardState returns true if the given HardState is empty.
@@ -364,7 +364,6 @@ func (n *node) run() {
 			}
 		case cc := <-n.confc:
 			_, okBefore := r.prs.Progress[r.id]
-			r.logger.Infof("shireen in node.go n.confc")
 			cs := r.applyConfChange(cc)
 			// If the node was removed, block incoming proposals. Note that we
 			// only do this if the node was in the config before. Nodes may be

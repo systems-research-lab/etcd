@@ -118,7 +118,7 @@ func (h *httpKVAPI) handleSplitQuorum(w http.ResponseWriter, r *http.Request) {
 		for _, id := range req.Ids {
 			changes = append(changes,
 				raftpb.ConfChangeSingle{
-					Type:    raftpb.ConfChangeUpdateNode,
+					Type:    raftpb.ConfChangeSplitNode,
 					NodeID:  id,
 					Context: nil,
 				})

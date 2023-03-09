@@ -243,8 +243,9 @@ func (c *Config) validate() error {
 type raft struct {
 	id uint64
 
-	Term uint64
-	Vote uint64
+	Epoch uint64
+	Term  uint64
+	Vote  uint64
 
 	readStates []ReadState
 
@@ -330,6 +331,7 @@ func newRaft(c *Config) *raft {
 
 	r := &raft{
 		id:                        c.ID,
+		Epoch:                     1,
 		lead:                      None,
 		isLearner:                 false,
 		raftLog:                   raftlog,
@@ -394,7 +396,9 @@ func (r *raft) send(m pb.Message) {
 	if m.From == None {
 		m.From = r.id
 	}
-	if m.Type == pb.MsgVote || m.Type == pb.MsgVoteResp || m.Type == pb.MsgPreVote || m.Type == pb.MsgPreVoteResp {
+	m.Epoch = r.Epoch
+	if m.Type == pb.MsgVote || m.Type == pb.MsgVoteResp || m.Type == pb.MsgPreVote || m.Type == pb.MsgPreVoteResp ||
+		m.Type == pb.MsgPull || m.Type == pb.MsgPullResp {
 		if m.Term == 0 {
 			// All {pre-,}campaign messages need to have the term set when
 			// sending.
@@ -566,8 +570,15 @@ func (r *raft) advance(rd Ready) {
 			// (which registers as zero).
 			ent := pb.Entry{
 				Type: pb.EntryConfChangeV2,
-				Data: nil,
 			}
+			if r.prs.Config.ToSplit {
+				_, data, err := pb.MarshalConfChange(pb.ConfChangeV2{Transition: pb.ConfChangeTransitionSplitLeave})
+				if err != nil {
+					panic("marshal split leave entry failed: " + err.Error())
+				}
+				ent.Data = data
+			}
+
 			// There's no way in which this proposal should be able to be rejected.
 			if !r.appendEntry(ent) {
 				panic("refused un-refusable auto-leaving ConfChangeV2")
@@ -851,7 +862,147 @@ func (r *raft) poll(id uint64, t pb.MessageType, v bool) (granted int, rejected 
 	return r.prs.TallyVotes(r.prs.Config.Quorum)
 }
 
+func (r *raft) handleEpoch(m pb.Message) (bool, error) {
+	if m.Term == 0 || m.Epoch == r.Epoch {
+		return true, nil
+	}
+
+	r.logger.Debugf("message from another epoch (current %d): %s", r.Epoch, m.String())
+	switch m.Type {
+	case pb.MsgVote:
+		if m.Epoch < r.Epoch {
+			// search for the entry of the epoch change
+			first, err := r.raftLog.storage.FirstIndex()
+			if err != nil {
+				r.logger.Errorf("get first entry index failed: %s", err)
+				return false, err
+			}
+			last, err := r.raftLog.storage.LastIndex()
+			if err != nil {
+				r.logger.Errorf("get last entry index failed: %s", err)
+				return false, err
+			}
+
+			entries, err := r.raftLog.slice(first, last, noLimit)
+			if err != nil {
+				r.logger.Errorf("get entries from %v to %v failed: %v", first, last, err)
+				return false, err
+			}
+
+			// it is committed either if:
+			// 1. it is found and its index is smaller than commit index, or
+			// 2. it is not found (already compacted).
+			found := false
+			committed := false
+			epochTerm := uint64(0)
+			for i := len(entries) - 1; i >= 0; i-- {
+				if entries[i].Type == pb.EntryConfChangeV2 {
+					var cc pb.ConfChangeV2
+					if err = cc.Unmarshal(entries[i].Data); err != nil {
+						r.logger.Errorf("unmarshal conf change failed: %v", err)
+						return false, err
+					}
+
+					// TODO: more rigours check (entry has to bear epoch info)
+					if cc.Transition == pb.ConfChangeTransitionSplitLeave {
+						found = true
+						committed = entries[i].Index <= r.raftLog.committed
+						epochTerm = entries[i].Term
+						break
+					}
+				}
+			}
+			committed = committed || !found
+
+			r.send(pb.Message{Type: voteRespMsgType(m.Type), To: m.From, Term: r.Term,
+				Epoch: r.Epoch, EpochTerm: epochTerm, EpochCommit: committed, Reject: true})
+		} else { // m.Epoch > r.Epoch
+			return false, nil
+		}
+	case pb.MsgVoteResp:
+		if m.Epoch < r.Epoch {
+			return false, nil
+		} else { // m.Epoch > r.Epoch
+			if m.EpochCommit {
+				r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: r.Term, Epoch: r.Epoch,
+					Commit: r.raftLog.committed})
+				r.logger.Debugf("send pull request since commit index %d", r.raftLog.committed)
+				return false, nil
+			} else {
+				// TODO: record epoch term
+				// r.logger.Panic("not implemented: record epoch term")
+				r.logger.Debugf("not implemented: record epoch term")
+				return false, nil
+			}
+		}
+	case pb.MsgPull:
+		if m.Epoch < r.Epoch {
+			if m.Commit < r.raftLog.firstIndex() {
+				// TODO: send snapshot
+				r.logger.Panic("not implemented: send snapshot for pull")
+			} else {
+				entries, err := r.raftLog.entries(m.Commit+1, r.maxMsgSize)
+				if err != nil {
+					r.logger.Panic("retrieve entries for pull failed: %v", err)
+				}
+
+				for i := len(entries) - 1; i >= 0; i-- {
+					if entries[i].Type == pb.EntryConfChangeV2 {
+						var cc pb.ConfChangeV2
+						if err = cc.Unmarshal(entries[i].Data); err != nil {
+							r.logger.Panic("unmarshal conf change failed: %v", err)
+						}
+
+						if cc.Transition == pb.ConfChangeTransitionSplitLeave {
+							r.send(pb.Message{Type: pb.MsgPullResp, To: m.From, Epoch: r.Epoch, Term: r.Term,
+								Entries: entries[:i+1]})
+							r.logger.Debugf("send %d entries upto index %d for pull",
+								len(entries), entries[len(entries)-1].Index)
+							return false, nil
+						}
+					}
+				}
+
+				r.logger.Panic("unable to find epoch change entry")
+			}
+		} else { // m.Epoch > r.Epoch
+			r.logger.Panic("pull from higher epoch %d (current %d), impossible!", m.Epoch, r.Epoch)
+		}
+	case pb.MsgPullResp:
+		if m.Epoch < r.Epoch {
+			r.logger.Debugf("pull resp from lower epoch %d (current %d), ignore", m.Epoch, r.Epoch)
+			return false, nil
+		} else {
+			firstIdx := m.Entries[0].Index
+			lastIdx := m.Entries[len(m.Entries)-1].Index
+
+			ci := r.raftLog.findConflict(m.Entries)
+			switch {
+			case ci == 0:
+				// do nothing, entries are already included in log
+				r.logger.Debugf("ignore pulled %d entries upto index %d", lastIdx-ci+1, r.raftLog.committed)
+			case ci <= r.raftLog.committed:
+				r.logger.Panicf("entry %d conflict with committed entry at %d", ci, r.raftLog.committed)
+			default:
+				r.raftLog.append(m.Entries[ci-firstIdx:]...)
+				r.raftLog.commitTo(lastIdx)
+				r.logger.Debugf("commit pulled %d entries upto index %d", lastIdx-ci+1, r.raftLog.committed)
+			}
+			return false, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (r *raft) Step(m pb.Message) error {
+	// Handle messages from another epoch
+	if cont, err := r.handleEpoch(m); err != nil {
+		return nil
+	} else if !cont {
+		return nil
+	}
+
 	// Handle the message term, which may result in our stepping down to a follower.
 	switch {
 	case m.Term == 0:
@@ -983,6 +1134,10 @@ func (r *raft) Step(m pb.Message) error {
 				r.id, r.raftLog.lastTerm(), r.raftLog.lastIndex(), r.Vote, m.Type, m.From, m.LogTerm, m.Index, r.Term)
 			r.send(pb.Message{To: m.From, Term: r.Term, Type: voteRespMsgType(m.Type), Reject: true})
 		}
+
+	case pb.MsgPull, pb.MsgPullResp:
+		// ignore pull request and response from the same epoch
+		return nil
 
 	default:
 		err := r.step(r, m)
@@ -1489,7 +1644,6 @@ func stepFollower(r *raft, m pb.Message) error {
 }
 
 func (r *raft) handleAppendEntries(m pb.Message) {
-	r.logger.Infof("shireen in handleAppendEntries")
 	if m.Index < r.raftLog.committed {
 		r.send(pb.Message{To: m.From, Type: pb.MsgAppResp, Index: r.raftLog.committed})
 		return
@@ -1631,7 +1785,6 @@ func (r *raft) handleSnapshot(m pb.Message) {
 // configuration of state machine. If this method returns false, the snapshot was
 // ignored, either because it was obsolete or because of an error.
 func (r *raft) restore(s pb.Snapshot) bool {
-	r.logger.Infof("shireen in restore")
 	if s.Metadata.Index <= r.raftLog.committed {
 		return false
 	}
@@ -1721,8 +1874,6 @@ func (r *raft) promotable() bool {
 }
 
 func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
-	r.logger.Infof("shireen in applyConfChange")
-
 	cfg, prs, err := func() (tracker.Config, tracker.ProgressMap, error) {
 		changer := confchange.Changer{
 			Tracker:   r.prs,
@@ -1736,6 +1887,8 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 		} else if autoLeave, ok = cc.EnterSplit(); ok {
 			return changer.EnterSplit(autoLeave, r.id, cc.Changes...)
 		} else if cc.LeaveSplit() {
+			r.Epoch++
+			r.logger.Infof("epoch increased to %v", r.Epoch)
 			return changer.LeaveSplit()
 		}
 		return changer.Simple(cc.Changes...)

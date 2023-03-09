@@ -58,6 +58,8 @@ enum MessageType {
 	MsgReadIndexResp   = 16;
 	MsgPreVote         = 17;
 	MsgPreVoteResp     = 18;
+	MsgPull            = 19;
+	MsgPullResp				 = 20;
 }
 
 message Message {
@@ -78,12 +80,16 @@ message Message {
 	optional bool        reject      = 10 [(gogoproto.nullable) = false];
 	optional uint64      rejectHint  = 11 [(gogoproto.nullable) = false];
 	optional bytes       context     = 12;
+	optional uint64      epoch       = 13 [(gogoproto.nullable) = false];
+	optional uint64      epochTerm	 = 14 [(gogoproto.nullable) = false]; // at which term, epoch was changed
+	optional bool      	 epochCommit = 15 [(gogoproto.nullable) = false]; // true if epoch change has committed
 }
 
 message HardState {
 	optional uint64 term   = 1 [(gogoproto.nullable) = false];
 	optional uint64 vote   = 2 [(gogoproto.nullable) = false];
 	optional uint64 commit = 3 [(gogoproto.nullable) = false];
+	optional uint64 epoch  = 4 [(gogoproto.nullable) = false];
 }
 
 // ConfChangeTransition specifies the behavior of a configuration change with
@@ -131,14 +137,16 @@ message ConfState {
 	optional bool   auto_leave        = 5 [(gogoproto.nullable) = false];
 	// added by shireen for storing quorum size.
 	optional uint64    quorum      = 6 [(gogoproto.nullable) = false];
-
+	// If set, the joint config is for split.
+	optional bool to_split = 7 [(gogoproto.nullable) = false];
 }
 
 enum ConfChangeType {
 	ConfChangeAddNode        = 0;
 	ConfChangeRemoveNode     = 1;
 	ConfChangeUpdateNode     = 2;
-	ConfChangeAddLearnerNode = 3;
+	ConfChangeSplitNode      = 3;
+	ConfChangeAddLearnerNode = 4;
 }
 
 message ConfChange {
