@@ -47,3 +47,7 @@ func (s *cls2clc) MemberRemove(ctx context.Context, r *pb.MemberRemoveRequest, o
 func (s *cls2clc) MemberPromote(ctx context.Context, r *pb.MemberPromoteRequest, opts ...grpc.CallOption) (*pb.MemberPromoteResponse, error) {
 	return s.cls.MemberPromote(ctx, r)
 }
+
+func (s *cls2clc) MemberSplit(ctx context.Context, r *pb.MemberSplitRequest, opts ...grpc.CallOption) (*pb.MemberSplitResponse, error) {
+	return s.cls.MemberSplit(ctx, r)
+}

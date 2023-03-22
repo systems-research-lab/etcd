@@ -105,6 +105,14 @@ func (cs *ClusterServer) MemberPromote(ctx context.Context, r *pb.MemberPromoteR
 	return &pb.MemberPromoteResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
 }
 
+func (cs *ClusterServer) MemberSplit(ctx context.Context, r *pb.MemberSplitRequest) (*pb.MemberSplitResponse, error) {
+	membs, err := cs.server.SplitMember(ctx, r.IDs, r.ExplicitLeave, r.Leave)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.MemberSplitResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
+}
+
 func (cs *ClusterServer) header() *pb.ResponseHeader {
 	return &pb.ResponseHeader{ClusterId: uint64(cs.cluster.ID()), MemberId: uint64(cs.server.ID()), RaftTerm: cs.server.Term()}
 }

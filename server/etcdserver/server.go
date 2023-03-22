@@ -56,7 +56,6 @@ import (
 	"go.etcd.io/etcd/server/v3/etcdserver/api/rafthttp"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v2discovery"
-	"go.etcd.io/etcd/server/v3/etcdserver/api/v2http/httptypes"
 	stats "go.etcd.io/etcd/server/v3/etcdserver/api/v2stats"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v2store"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3alarm"
@@ -170,6 +169,8 @@ type Server interface {
 	// return ErrLearnerNotReady if the member are not ready.
 	// return ErrMemberNotLearner if the member is not a learner.
 	PromoteMember(ctx context.Context, id uint64) ([]*membership.Member, error)
+
+	SplitMember(ctx context.Context, ids []uint64, explicitLeave, leave bool) ([]*membership.Member, error)
 
 	// ClusterVersion is the cluster-wide minimum major.minor version.
 	// Cluster version is set to the min version that an etcd member is
@@ -294,6 +295,8 @@ type EtcdServer struct {
 
 	*AccessController
 	corruptionChecker CorruptionChecker
+
+	appliedConfEntry map[string]struct{}
 }
 
 type backendHooks struct {
@@ -841,6 +844,7 @@ func (s *EtcdServer) start() {
 	s.readwaitc = make(chan struct{}, 1)
 	s.readNotifier = newNotifier()
 	s.leaderChanged = make(chan struct{})
+	s.appliedConfEntry = make(map[string]struct{})
 	if s.ClusterVersion() != nil {
 		lg.Info(
 			"starting etcd server",
@@ -969,15 +973,15 @@ func (h *downgradeEnabledHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 // Process takes a raft message and applies it to the server's raft state
 // machine, respecting any timeout of the given context.
 func (s *EtcdServer) Process(ctx context.Context, m raftpb.Message) error {
-	lg := s.Logger()
-	if s.cluster.IsIDRemoved(types.ID(m.From)) {
-		lg.Warn(
-			"rejected Raft message from removed member",
-			zap.String("local-member-id", s.ID().String()),
-			zap.String("removed-member-id", types.ID(m.From).String()),
-		)
-		return httptypes.NewHTTPError(http.StatusForbidden, "cannot process message from removed member")
-	}
+	//lg := s.Logger()
+	//if s.cluster.IsIDRemoved(types.ID(m.From)) {
+	//	lg.Warn(
+	//		"rejected Raft message from removed member",
+	//		zap.String("local-member-id", s.ID().String()),
+	//		zap.String("removed-member-id", types.ID(m.From).String()),
+	//	)
+	//	return httptypes.NewHTTPError(http.StatusForbidden, "cannot process message from removed member")
+	//}
 	if m.Type == raftpb.MsgApp {
 		s.stats.RecvAppendReq(types.ID(m.From).String(), m.Size())
 	}
@@ -1196,6 +1200,7 @@ func (s *EtcdServer) Cleanup() {
 
 func (s *EtcdServer) applyAll(ep *etcdProgress, apply *apply) {
 	s.applySnapshot(ep, apply)
+	s.applyConfChangeEnts(apply)
 	s.applyEntries(ep, apply)
 
 	proposalsApplied.Set(float64(ep.appliedi))
@@ -1383,6 +1388,68 @@ func (s *EtcdServer) applyEntries(ep *etcdProgress, apply *apply) {
 	var shouldstop bool
 	if ep.appliedt, ep.appliedi, shouldstop = s.apply(ents, &ep.confState); shouldstop {
 		go s.stopWithDelay(10*100*time.Millisecond, fmt.Errorf("the member has been permanently removed from the cluster"))
+	}
+}
+
+func (s *EtcdServer) applyConfChangeEnts(apply *apply) {
+	if len(apply.confChangeEnts) == 0 {
+		return
+	}
+
+	for _, ent := range apply.confChangeEnts {
+		switch ent.Type {
+		case raftpb.EntryConfChange:
+			continue
+		case raftpb.EntryConfChangeV2:
+			s.applyConfChangeV2(ent)
+		default:
+			panic("not a conf change entry: " + ent.String())
+		}
+	}
+}
+
+func appliedConfEntryKey(entry raftpb.Entry) string {
+	// TODO: add epoch
+	return strconv.FormatUint(entry.Term, 10) + "-" + strconv.FormatUint(entry.Index, 10)
+}
+
+func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
+	var cc raftpb.ConfChangeV2
+	pbutil.MustUnmarshal(&cc, entry.Data)
+	cc.ConfTerm = entry.Term
+	cc.ConfIndex = entry.Index
+
+	if cc.Transition != raftpb.ConfChangeTransitionSplitImplicit &&
+		cc.Transition != raftpb.ConfChangeTransitionSplitExplicit &&
+		cc.Transition != raftpb.ConfChangeTransitionSplitLeave {
+		s.lg.Info("unsupported conf change entry: " + entry.String())
+		return
+	}
+
+	var confState *raftpb.ConfState
+	key := appliedConfEntryKey(entry)
+	if _, ok := s.appliedConfEntry[key]; ok {
+		s.lg.Info("entry has already been applied")
+	} else {
+		confState = s.r.ApplyConfChange(cc)
+		s.appliedConfEntry[key] = struct{}{}
+	}
+
+	if cc.Transition == raftpb.ConfChangeTransitionSplitLeave && confState != nil {
+		if len(confState.VotersOutgoing) != 0 {
+			panic("Should already left joint consensus! ConfState: " + confState.String())
+		}
+
+		voters := map[types.ID]struct{}{}
+		for _, v := range confState.Voters {
+			voters[types.ID(v)] = struct{}{}
+		}
+
+		for _, m := range s.cluster.Members() {
+			if _, ok := voters[m.ID]; !ok && s.IsMemberExist(m.ID) {
+				s.cluster.RemoveMember(m.ID, membership.ApplyBoth)
+			}
+		}
 	}
 }
 
@@ -1677,6 +1744,45 @@ func (s *EtcdServer) PromoteMember(ctx context.Context, id uint64) ([]*membershi
 		return nil, ErrTimeout
 	}
 	return nil, ErrCanceled
+}
+
+func (s *EtcdServer) SplitMember(ctx context.Context, ids []uint64, explictLeave, leave bool) ([]*membership.Member, error) {
+	if err := s.checkMembershipOperationPermission(ctx); err != nil {
+		return nil, err
+	}
+
+	for _, id := range ids {
+		if s.cluster.Member(types.ID(id)) == nil {
+			return nil, fmt.Errorf("unexisted member id: %v", id)
+		}
+	}
+
+	if leave { // leave joint consensus for split
+		if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{Transition: raftpb.ConfChangeTransitionSplitLeave}); err != nil {
+			return nil, err
+		}
+	} else { // enter joint consensus for split
+		changes := make([]raftpb.ConfChangeSingle, 0, len(ids))
+		for _, id := range ids {
+			changes = append(changes,
+				raftpb.ConfChangeSingle{
+					Type:    raftpb.ConfChangeSplitNode,
+					NodeID:  id,
+					Context: nil,
+				})
+		}
+
+		transition := raftpb.ConfChangeTransitionSplitImplicit
+		if explictLeave {
+			transition = raftpb.ConfChangeTransitionSplitExplicit
+		}
+
+		if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{Transition: transition, Changes: changes}); err != nil {
+			return nil, err
+		}
+	}
+
+	return nil, nil
 }
 
 // promoteMember checks whether the to-be-promoted learner node is ready before sending the promote
@@ -2157,11 +2263,19 @@ func (s *EtcdServer) apply(
 
 			var cc raftpb.ConfChange
 			pbutil.MustUnmarshal(&cc, e.Data)
+			cc.ConfTerm = e.Term
+			cc.ConfIndex = e.Index
+
 			removedSelf, err := s.applyConfChange(cc, confState, shouldApplyV3)
 			s.setAppliedIndex(e.Index)
 			s.setTerm(e.Term)
 			shouldStop = shouldStop || removedSelf
 			s.w.Trigger(cc.ID, &confChangeResponse{s.cluster.Members(), err})
+
+		case raftpb.EntryConfChangeV2:
+			s.applyConfChangeV2(e)
+			s.setAppliedIndex(e.Index)
+			s.setTerm(e.Term)
 
 		default:
 			lg := s.Logger()
@@ -2170,9 +2284,10 @@ func (s *EtcdServer) apply(
 				zap.String("type", e.Type.String()),
 			)
 		}
-		appliedi, appliedt = e.Index, e.Term
 	}
-	return appliedt, appliedi, shouldStop
+
+	lastEntry := es[len(es)-1]
+	return lastEntry.Term, lastEntry.Index, shouldStop
 }
 
 // applyEntryNormal apples an EntryNormal type raftpb request to the EtcdServer

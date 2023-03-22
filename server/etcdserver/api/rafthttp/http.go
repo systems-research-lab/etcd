@@ -390,16 +390,16 @@ func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid from", http.StatusNotFound)
 		return
 	}
-	if h.r.IsIDRemoved(uint64(from)) {
-		h.lg.Warn(
-			"rejected stream from remote peer because it was removed",
-			zap.String("local-member-id", h.tr.ID.String()),
-			zap.String("remote-peer-id-stream-handler", h.id.String()),
-			zap.String("remote-peer-id-from", from.String()),
-		)
-		http.Error(w, "removed member", http.StatusGone)
-		return
-	}
+	//if h.r.IsIDRemoved(uint64(from)) {
+	//	h.lg.Warn(
+	//		"rejected stream from remote peer because it was removed",
+	//		zap.String("local-member-id", h.tr.ID.String()),
+	//		zap.String("remote-peer-id-stream-handler", h.id.String()),
+	//		zap.String("remote-peer-id-from", from.String()),
+	//	)
+	//	http.Error(w, "removed member", http.StatusGone)
+	//	return
+	//}
 	p := h.peerGetter.Get(from)
 	if p == nil {
 		// This may happen in following cases:

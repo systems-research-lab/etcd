@@ -30,6 +30,7 @@ type (
 	MemberRemoveResponse  pb.MemberRemoveResponse
 	MemberUpdateResponse  pb.MemberUpdateResponse
 	MemberPromoteResponse pb.MemberPromoteResponse
+	MemberSplitResponse   pb.MemberPromoteResponse
 )
 
 type Cluster interface {
@@ -50,6 +51,8 @@ type Cluster interface {
 
 	// MemberPromote promotes a member from raft learner (non-voting) to raft voting member.
 	MemberPromote(ctx context.Context, id uint64) (*MemberPromoteResponse, error)
+
+	MemberSplit(ctx context.Context, ids []uint64, explictLeave, leave bool) (*MemberSplitResponse, error)
 }
 
 type cluster struct {
@@ -138,4 +141,13 @@ func (c *cluster) MemberPromote(ctx context.Context, id uint64) (*MemberPromoteR
 		return nil, toErr(ctx, err)
 	}
 	return (*MemberPromoteResponse)(resp), nil
+}
+
+func (c *cluster) MemberSplit(ctx context.Context, ids []uint64, explictLeave, leave bool) (*MemberSplitResponse, error) {
+	r := &pb.MemberSplitRequest{IDs: ids, ExplicitLeave: explictLeave, Leave: leave}
+	resp, err := c.remote.MemberSplit(ctx, r, c.callOpts...)
+	if err != nil {
+		return nil, toErr(ctx, err)
+	}
+	return (*MemberSplitResponse)(resp), nil
 }

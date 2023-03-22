@@ -69,11 +69,11 @@ type Storage interface {
 	// so raft state machine could know that Storage needs some time to prepare
 	// snapshot and call Snapshot later.
 	Snapshot() (pb.Snapshot, error)
-	//added by shireen
-	//Set the current and previous confstate for restore corner case
+
+	// Set the current conf state for corner case restore
 	SetConfState(currState pb.ConfMetadata) error
 
-	//Get the current and previous confstate for restore corner case
+	// Get the current and previous conf state for corner case restore
 	GetPrevConfState() pb.ConfMetadata
 	GetCurrentConfState() pb.ConfMetadata
 }
@@ -283,7 +283,7 @@ func (ms *MemoryStorage) Append(entries []pb.Entry) error {
 	return nil
 }
 
-//set the previousConfState and current confState
+// set the previousConfState and current confState
 func (ms *MemoryStorage) SetConfState(currState pb.ConfMetadata) error {
 	ms.Lock()
 	defer ms.Unlock()
@@ -292,12 +292,12 @@ func (ms *MemoryStorage) SetConfState(currState pb.ConfMetadata) error {
 	return nil
 }
 
-//get the previous confstate
+// get the previous confstate
 func (ms *MemoryStorage) GetPrevConfState() pb.ConfMetadata {
 	return ms.prevconfstate
 }
 
-//get the current confstate
+// get the current confstate
 func (ms *MemoryStorage) GetCurrentConfState() pb.ConfMetadata {
 	return ms.currconfstate
 }

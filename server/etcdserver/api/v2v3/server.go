@@ -95,6 +95,10 @@ func (s *v2v3Server) UpdateMember(ctx context.Context, m membership.Member) ([]*
 	return v3MembersToMembership(resp.Members), nil
 }
 
+func (s *v2v3Server) SplitMember(ctx context.Context, ids []uint64, explicitLeave, leave bool) ([]*membership.Member, error) {
+	panic("unimplemented!")
+}
+
 func v3MembersToMembership(v3membs []*pb.Member) []*membership.Member {
 	membs := make([]*membership.Member, len(v3membs))
 	for i, m := range v3membs {

@@ -17,6 +17,7 @@ package command
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
@@ -163,6 +164,7 @@ func (p *printerUnsupported) MoveLeader(leader, target uint64, r v3.MoveLeaderRe
 
 func makeMemberListTable(r v3.MemberListResponse) (hdr []string, rows [][]string) {
 	hdr = []string{"ID", "Status", "Name", "Peer Addrs", "Client Addrs", "Is Learner"}
+	sort.Slice(r.Members, func(i, j int) bool { return r.Members[i].Name < r.Members[j].Name })
 	for _, m := range r.Members {
 		status := "started"
 		if len(m.Name) == 0 {
@@ -174,6 +176,7 @@ func makeMemberListTable(r v3.MemberListResponse) (hdr []string, rows [][]string
 		}
 		rows = append(rows, []string{
 			fmt.Sprintf("%x", m.ID),
+			fmt.Sprintf("%d", m.ID),
 			status,
 			m.Name,
 			strings.Join(m.PeerURLs, ","),

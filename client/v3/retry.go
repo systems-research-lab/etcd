@@ -183,6 +183,10 @@ func (rcc *retryClusterClient) MemberPromote(ctx context.Context, in *pb.MemberP
 	return rcc.cc.MemberPromote(ctx, in, opts...)
 }
 
+func (rcc *retryClusterClient) MemberSplit(ctx context.Context, in *pb.MemberSplitRequest, opts ...grpc.CallOption) (resp *pb.MemberSplitResponse, err error) {
+	return rcc.cc.MemberSplit(ctx, in, opts...)
+}
+
 type retryMaintenanceClient struct {
 	mc pb.MaintenanceClient
 }

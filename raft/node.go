@@ -512,11 +512,12 @@ func (n *node) Advance() {
 }
 
 func (n *node) ApplyConfChange(cc pb.ConfChangeI) *pb.ConfState {
-	var cs pb.ConfState
 	select {
 	case n.confc <- cc.AsV2():
 	case <-n.done:
 	}
+
+	var cs pb.ConfState
 	select {
 	case cs = <-n.confstatec:
 	case <-n.done:

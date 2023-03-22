@@ -173,6 +173,13 @@ service Cluster {
         body: "*"
     };
   }
+
+  rpc MemberSplit(MemberSplitRequest) returns (MemberSplitResponse) {
+      option (google.api.http) = {
+        post: "/v3/cluster/member/split"
+        body: "*"
+      };
+  }
 }
 
 service Maintenance {
@@ -933,6 +940,21 @@ message MemberPromoteRequest {
 message MemberPromoteResponse {
   ResponseHeader header = 1;
   // members is a list of all members after promoting the member.
+  repeated Member members = 2;
+}
+
+message MemberSplitRequest {
+  // IDs of nodes to split from the cluster
+  repeated uint64 IDs = 1;
+  // ExplicitLeave tells whether nodes should leave the joint consensus automatically when safe
+  bool ExplicitLeave = 2;
+  // Leave explicitly tells the cluster in joint consensus to leave
+  bool Leave = 3;
+}
+
+message MemberSplitResponse {
+  ResponseHeader header = 1;
+  // members is a list of all members after split the members, only be used when explicitly as the cluster to leave
   repeated Member members = 2;
 }
 

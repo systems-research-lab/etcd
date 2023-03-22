@@ -315,7 +315,7 @@ type raft struct {
 	// current term.
 	pendingReadIndexMessages []pb.Message
 
-	//for applying configuration change during restore
+	// for applying configuration change during restore
 	currentConfMetadata pb.ConfMetadata
 }
 
@@ -347,7 +347,7 @@ func newRaft(c *Config) *raft {
 		disableProposalForwarding: c.DisableProposalForwarding,
 	}
 
-	//added by shireen for getting confstate in storage for restore
+	c.Storage.SetConfState(pb.ConfMetadata{ConfState: cs, Term: 0, Index: 0})
 	r.currentConfMetadata = c.Storage.GetCurrentConfState()
 
 	cfg, prs, err := confchange.Restore(confchange.Changer{
@@ -554,6 +554,20 @@ func (r *raft) bcastHeartbeatWithCtx(ctx []byte) {
 func (r *raft) advance(rd Ready) {
 	r.reduceUncommittedSize(rd.CommittedEntries)
 
+	// If the entry to leave split joint consensus is committed, increase epoch.
+	for idx := range rd.CommittedEntries {
+		if rd.CommittedEntries[idx].Type == pb.EntryConfChangeV2 {
+			var ccv2 pb.ConfChangeV2
+			if err := ccv2.Unmarshal(rd.CommittedEntries[idx].Data); err != nil {
+				panic("unmarshal entry conf failed: " + err.Error())
+			}
+			if ccv2.Transition == pb.ConfChangeTransitionSplitLeave {
+				r.Epoch++
+				r.logger.Infof("increased epoch to %v", r.Epoch)
+			}
+		}
+	}
+
 	// If entries were applied (or a snapshot), update our cursor for
 	// the next Ready. Note that if the current HardState contains a
 	// new Commit index, this does not mean that we're also applying
@@ -570,6 +584,7 @@ func (r *raft) advance(rd Ready) {
 			// (which registers as zero).
 			ent := pb.Entry{
 				Type: pb.EntryConfChangeV2,
+				Data: nil,
 			}
 			if r.prs.Config.ToSplit {
 				_, data, err := pb.MarshalConfChange(pb.ConfChangeV2{Transition: pb.ConfChangeTransitionSplitLeave})
@@ -595,17 +610,12 @@ func (r *raft) advance(rd Ready) {
 	if !IsEmptySnap(rd.Snapshot) {
 		r.raftLog.stableSnapTo(rd.Snapshot.Metadata.Index)
 	}
-
-	if !IsEmptyConfMetadata(rd.CurrentConfMetadata) {
-		r.currentConfMetadata = pb.ConfMetadata{}
-	}
 }
 
 // maybeCommit attempts to advance the commit index. Returns true if
 // the commit index changed (in which case the caller should call
 // r.bcastAppend).
 func (r *raft) maybeCommit() bool {
-
 	mci := r.prs.Committed(r.prs.Config.Quorum)
 	return r.raftLog.maybeCommit(mci, r.Term)
 }
@@ -642,7 +652,6 @@ func (r *raft) reset(term uint64) {
 }
 
 func (r *raft) appendEntry(es ...pb.Entry) (accepted bool) {
-	r.logger.Infof("shireen in appendEntry")
 	li := r.raftLog.lastIndex()
 	for i := range es {
 		es[i].Term = r.Term
@@ -1192,7 +1201,7 @@ func stepLeader(r *raft, m pb.Message) error {
 			r.logger.Debugf("%x [term %d] transfer leadership to %x is in progress; dropping proposal", r.id, r.Term, r.leadTransferee)
 			return ErrProposalDropped
 		}
-		var ignoreConfEntry bool
+
 		for i := range m.Entries {
 			e := &m.Entries[i]
 			var cc pb.ConfChangeI
@@ -1209,42 +1218,35 @@ func stepLeader(r *raft, m pb.Message) error {
 				}
 				cc = ccc
 			}
-			ignoreConfEntry = false
 			if cc != nil {
-				//alreadyPending := r.pendingConfIndex > r.raftLog.applied
+				alreadyPending := r.pendingConfIndex > r.raftLog.applied
 				alreadyJoint := len(r.prs.Config.Voters[1]) > 0
-				wantsLeaveJoint := len(cc.AsV2().Changes) == 0 && cc.AsV2().Quorum == 0
+				wantsLeaveJoint := len(cc.AsV2().Changes) == 0 || cc.AsV2().Transition == pb.ConfChangeTransitionSplitLeave
 
 				var refused string
-				/**if alreadyPending {
+				if alreadyPending {
 					refused = fmt.Sprintf("possible unapplied conf change at index %d (applied to %d)", r.pendingConfIndex, r.raftLog.applied)
-				} else **/if alreadyJoint && !wantsLeaveJoint {
+				} else if alreadyJoint && !wantsLeaveJoint {
 					refused = "must transition out of joint config first"
 				} else if !alreadyJoint && wantsLeaveJoint {
 					refused = "not in joint state; refusing empty conf change"
+				} else if !r.committedEntryInCurrentTerm() {
+					refused = "must commit an entry at current term before proposing conf changes"
 				}
 
 				if refused != "" {
 					r.logger.Infof("%x ignoring conf change %v at config %s: %s", r.id, cc, r.prs.Config, refused)
 					m.Entries[i] = pb.Entry{Type: pb.EntryNormal}
-				} else if r.pendingConfIndex > r.raftLog.applied || !r.committedEntryInCurrentTerm() {
-					r.logger.Infof("%x ignoring conf change by shireen %v at config %s: %s", r.id, cc, r.prs.Config, refused)
-					ignoreConfEntry = true
 				} else {
 					r.pendingConfIndex = r.raftLog.lastIndex() + uint64(i) + 1
 				}
+			}
+		}
 
-			}
+		if !r.appendEntry(m.Entries...) {
+			return ErrProposalDropped
 		}
-		//shireen changes preventing future conf entry to be applied untill this conf entry is committed
-		//untill an entry has been committed in the current term preventing the current conf entry to be
-		//added to the log
-		if !ignoreConfEntry {
-			if !r.appendEntry(m.Entries...) {
-				return ErrProposalDropped
-			}
-			r.bcastAppend()
-		}
+		r.bcastAppend()
 		return nil
 	case pb.MsgReadIndex:
 		// only one voting member (the leader) in the cluster
@@ -1690,7 +1692,6 @@ func (r *raft) handleAppendEntries(m pb.Message) {
 
 // added by shireen for restoring the prv conf
 func (r *raft) restorePreviousConf(currentConf pb.ConfMetadata, prevConf pb.ConfMetadata) bool {
-	r.logger.Infof("shireen in restorePreviousConf")
 	if currentConf.Index <= r.raftLog.committed {
 		return false
 	}
@@ -1887,8 +1888,6 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 		} else if autoLeave, ok = cc.EnterSplit(); ok {
 			return changer.EnterSplit(autoLeave, r.id, cc.Changes...)
 		} else if cc.LeaveSplit() {
-			r.Epoch++
-			r.logger.Infof("epoch increased to %v", r.Epoch)
 			return changer.LeaveSplit()
 		}
 		return changer.Simple(cc.Changes...)
@@ -1899,14 +1898,17 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 		panic(err)
 	}
 
-	//added by shireen for conf change restore corner case
+	confState := r.switchToConfig(cfg, prs)
+
 	r.currentConfMetadata.Term = cc.ConfTerm
 	r.currentConfMetadata.Index = cc.ConfIndex
-	r.currentConfMetadata.ConfState = r.switchToConfig(cfg, prs)
-	r.logger.Infof("applyConfChange entry at term %d and index %d ",
+	r.currentConfMetadata.ConfState = confState
+	r.logger.Infof("apply conf change at term %d and index %d ",
 		r.currentConfMetadata.Index, r.currentConfMetadata.Term)
 
-	return r.currentConfMetadata.ConfState
+	r.raftLog.storage.SetConfState(r.currentConfMetadata)
+
+	return confState
 }
 
 // switchToConfig reconfigures this node to use the provided configuration. It

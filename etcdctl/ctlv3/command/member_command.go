@@ -28,6 +28,8 @@ import (
 var (
 	memberPeerURLs string
 	isLearner      bool
+	explictLeave   bool
+	leave          bool
 )
 
 // NewMemberCommand returns the cobra command for "member".
@@ -42,6 +44,7 @@ func NewMemberCommand() *cobra.Command {
 	mc.AddCommand(NewMemberUpdateCommand())
 	mc.AddCommand(NewMemberListCommand())
 	mc.AddCommand(NewMemberPromoteCommand())
+	mc.AddCommand(NewMemberSplitCommand())
 
 	return mc
 }
@@ -112,6 +115,23 @@ func NewMemberPromoteCommand() *cobra.Command {
 
 		Run: memberPromoteCommandFunc,
 	}
+
+	return cc
+}
+
+// NewMemberSplitCommand returns the cobra command for "member split".
+func NewMemberSplitCommand() *cobra.Command {
+	cc := &cobra.Command{
+		Use:   "split <memberIDs>",
+		Short: "Split members (comma seperated IDs) from the cluster",
+		Long: `Split members from the cluster.
+`,
+
+		Run: memberSplitCommandFunc,
+	}
+
+	cc.Flags().BoolVar(&explictLeave, "explict-leave", false, "indicates if members should leave split joint consensus explicitly")
+	cc.Flags().BoolVar(&leave, "leave", false, "indicates if members should leave split joint consensus")
 
 	return cc
 }
@@ -253,4 +273,27 @@ func memberPromoteCommandFunc(cmd *cobra.Command, args []string) {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)
 	}
 	display.MemberPromote(id, *resp)
+}
+
+func memberSplitCommandFunc(cmd *cobra.Command, args []string) {
+	if len(args) < 1 {
+		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("member IDs is not provided"))
+	}
+
+	idStrs := strings.Split(args[0], ",")
+	ids := make([]uint64, 0, len(idStrs))
+	for _, idStr := range idStrs {
+		id, err := strconv.ParseUint(idStr, 16, 64)
+		if err != nil {
+			cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("bad member ID arg (%v), expecting ID in Hex", err))
+		}
+		ids = append(ids, id)
+	}
+
+	ctx, cancel := commandCtx(cmd)
+	_, err := mustClientFromCmd(cmd).MemberSplit(ctx, ids, explictLeave, leave)
+	cancel()
+	if err != nil {
+		cobrautl.ExitWithError(cobrautl.ExitError, err)
+	}
 }
