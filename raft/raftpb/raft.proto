@@ -82,8 +82,6 @@ message Message {
 	optional uint64      rejectHint  = 11 [(gogoproto.nullable) = false];
 	optional bytes       context     = 12;
 	optional uint64      epoch       = 13 [(gogoproto.nullable) = false];
-	optional uint64      epochTerm	 = 14 [(gogoproto.nullable) = false]; // at which term, epoch was changed
-	optional bool      	 epochCommit = 15 [(gogoproto.nullable) = false]; // true if epoch change has committed
 }
 
 message HardState {

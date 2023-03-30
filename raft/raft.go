@@ -882,51 +882,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 	switch m.Type {
 	case pb.MsgVote:
 		if m.Epoch < r.Epoch {
-			// search for the entry of the epoch change
-			first, err := r.raftLog.storage.FirstIndex()
-			if err != nil {
-				r.logger.Errorf("get first entry index failed: %s", err)
-				return false, err
-			}
-			last, err := r.raftLog.storage.LastIndex()
-			if err != nil {
-				r.logger.Errorf("get last entry index failed: %s", err)
-				return false, err
-			}
-
-			entries, err := r.raftLog.slice(first, last, noLimit)
-			if err != nil {
-				r.logger.Errorf("get entries from %v to %v failed: %v", first, last, err)
-				return false, err
-			}
-
-			// it is committed either if:
-			// 1. it is found and its index is smaller than commit index, or
-			// 2. it is not found (already compacted).
-			found := false
-			committed := false
-			epochTerm := uint64(0)
-			for i := len(entries) - 1; i >= 0; i-- {
-				if entries[i].Type == pb.EntryConfChangeV2 {
-					var cc pb.ConfChangeV2
-					if err = cc.Unmarshal(entries[i].Data); err != nil {
-						r.logger.Errorf("unmarshal conf change failed: %v", err)
-						return false, err
-					}
-
-					// TODO: more rigours check (entry has to bear epoch info)
-					if cc.Transition == pb.ConfChangeTransitionSplitLeave {
-						found = true
-						committed = entries[i].Index <= r.raftLog.committed
-						epochTerm = entries[i].Term
-						break
-					}
-				}
-			}
-			committed = committed || !found
-
-			r.send(pb.Message{Type: voteRespMsgType(m.Type), To: m.From, Term: r.Term,
-				Epoch: r.Epoch, EpochTerm: epochTerm, EpochCommit: committed, Reject: true})
+			r.send(pb.Message{Type: voteRespMsgType(m.Type), To: m.From, Term: r.Term, Epoch: r.Epoch, Reject: true})
 		} else { // m.Epoch > r.Epoch
 			return false, nil
 		}
@@ -934,17 +890,23 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 		if m.Epoch < r.Epoch {
 			return false, nil
 		} else { // m.Epoch > r.Epoch
-			if m.EpochCommit {
-				r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: r.Term, Epoch: r.Epoch,
-					Commit: r.raftLog.committed})
-				r.logger.Debugf("send pull request since commit index %d", r.raftLog.committed)
-				return false, nil
-			} else {
-				// TODO: record epoch term
-				// r.logger.Panic("not implemented: record epoch term")
-				r.logger.Debugf("not implemented: record epoch term")
-				return false, nil
-			}
+			r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: r.Term, Epoch: r.Epoch, Commit: r.raftLog.committed})
+			r.logger.Debugf("send pull request since commit index %d", r.raftLog.committed)
+			r.becomeFollower(r.Term, None)
+			return false, nil
+		}
+	case pb.MsgApp:
+		if m.Epoch < r.Epoch {
+			// TODO: reject
+		} else {
+			r.becomeFollower(m.Term, m.From)
+			r.handleAppendEntries(m)
+		}
+	case pb.MsgAppResp:
+		if m.Epoch < r.Epoch {
+			// TODO: handle log matching as normal
+		} else {
+			// TODO: pull
 		}
 	case pb.MsgPull:
 		if m.Epoch < r.Epoch {
@@ -952,7 +914,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 				// TODO: send snapshot
 				r.logger.Panic("not implemented: send snapshot for pull")
 			} else {
-				entries, err := r.raftLog.entries(m.Commit+1, r.maxMsgSize)
+				entries, err := r.raftLog.entries(m.Commit+1, noLimit)
 				if err != nil {
 					r.logger.Panic("retrieve entries for pull failed: %v", err)
 				}
@@ -967,8 +929,8 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 						if cc.Transition == pb.ConfChangeTransitionSplitLeave {
 							r.send(pb.Message{Type: pb.MsgPullResp, To: m.From, Epoch: r.Epoch, Term: r.Term,
 								Entries: entries[:i+1]})
-							r.logger.Debugf("send %d entries upto index %d for pull",
-								len(entries), entries[len(entries)-1].Index)
+							r.logger.Debugf("send %d entries indexed from %d to %d for pull",
+								len(entries), entries[i].Index, entries[len(entries)-1].Index)
 							return false, nil
 						}
 					}
