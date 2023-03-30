@@ -331,7 +331,6 @@ func newRaft(c *Config) *raft {
 
 	r := &raft{
 		id:                        c.ID,
-		Epoch:                     1,
 		lead:                      None,
 		isLearner:                 false,
 		raftLog:                   raftlog,
@@ -384,6 +383,7 @@ func (r *raft) softState() *SoftState { return &SoftState{Lead: r.lead, RaftStat
 
 func (r *raft) hardState() pb.HardState {
 	return pb.HardState{
+		Epoch:  r.Epoch,
 		Term:   r.Term,
 		Vote:   r.Vote,
 		Commit: r.raftLog.committed,
@@ -562,8 +562,9 @@ func (r *raft) advance(rd Ready) {
 				panic("unmarshal entry conf failed: " + err.Error())
 			}
 			if ccv2.Transition == pb.ConfChangeTransitionSplitLeave {
-				r.Epoch++
-				r.logger.Infof("increased epoch to %v", r.Epoch)
+				oldEpoch := r.Epoch
+				r.Epoch = rd.CommittedEntries[idx].Epoch + 1
+				r.logger.Infof("epoch changed from %v to %v", oldEpoch, r.Epoch)
 			}
 		}
 	}
@@ -654,6 +655,7 @@ func (r *raft) reset(term uint64) {
 func (r *raft) appendEntry(es ...pb.Entry) (accepted bool) {
 	li := r.raftLog.lastIndex()
 	for i := range es {
+		es[i].Epoch = r.Epoch
 		es[i].Term = r.Term
 		es[i].Index = li + 1 + uint64(i)
 	}
@@ -1974,6 +1976,7 @@ func (r *raft) loadState(state pb.HardState) {
 		r.logger.Panicf("%x state.commit %d is out of range [%d, %d]", r.id, state.Commit, r.raftLog.committed, r.raftLog.lastIndex())
 	}
 	r.raftLog.committed = state.Commit
+	r.Epoch = state.Epoch
 	r.Term = state.Term
 	r.Vote = state.Vote
 }

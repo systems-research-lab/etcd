@@ -235,6 +235,7 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 							for _, msg := range rd.Messages {
 								r.lg.Info("leave message", zap.String("msg", msg.String()))
 							}
+							r.lg.Info("leave entry", zap.String("entry", ent.String()))
 						}
 					}
 				}

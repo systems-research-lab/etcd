@@ -614,7 +614,7 @@ func MustSync(st, prevst pb.HardState, entsnum int) bool {
 	// currentTerm
 	// votedFor
 	// log entries[]
-	return entsnum != 0 || st.Vote != prevst.Vote || st.Term != prevst.Term
+	return entsnum != 0 || st.Vote != prevst.Vote || st.Term != prevst.Term || st.Epoch != prevst.Epoch
 }
 
 // IsEmptyConfMetadata returns true if the given confmetadata is empty.

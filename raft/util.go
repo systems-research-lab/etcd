@@ -63,6 +63,7 @@ func voteRespMsgType(msgt pb.MessageType) pb.MessageType {
 
 func DescribeHardState(hs pb.HardState) string {
 	var buf strings.Builder
+	fmt.Fprintf(&buf, "Epoch:%d", hs.Epoch)
 	fmt.Fprintf(&buf, "Term:%d", hs.Term)
 	if hs.Vote != 0 {
 		fmt.Fprintf(&buf, " Vote:%d", hs.Vote)
