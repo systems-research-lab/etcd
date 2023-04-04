@@ -693,7 +693,7 @@ var xxx_messageInfo_SnapshotInfo proto.InternalMessageInfo
 
 type Response struct {
 	Success bool   `protobuf:"varint,1,opt,name=Success,proto3" json:"Success,omitempty"`
-	Status  string `protobuf:"bytes,2,opt,name=Status,proto3" json:"Status,omitempty"`
+	Status  string `protobuf:"bytes,2,opt,name=Progress,proto3" json:"Progress,omitempty"`
 	// Member contains the same Member object from tester request.
 	Member *Member `protobuf:"bytes,3,opt,name=Member,proto3" json:"Member,omitempty"`
 	// SnapshotInfo contains SAVE_SNAPSHOT request results.
@@ -3348,7 +3348,7 @@ func (m *Response) Unmarshal(dAtA []byte) error {
 			m.Success = bool(v != 0)
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Progress", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {

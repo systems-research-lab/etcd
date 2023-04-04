@@ -150,6 +150,8 @@ type Node interface {
 	// usage details and semantics.
 	ProposeConfChange(ctx context.Context, cc pb.ConfChangeI) error
 
+	ProposeMerge(ctx context.Context, cc pb.MergeInfo) error
+
 	// Step advances the state machine using the given message. ctx.Err() will be returned, if any.
 	Step(ctx context.Context, msg pb.Message) error
 
@@ -426,6 +428,15 @@ func (n *node) Campaign(ctx context.Context) error { return n.step(ctx, pb.Messa
 
 func (n *node) Propose(ctx context.Context, data []byte) error {
 	return n.stepWait(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Data: data}}})
+}
+
+func (n *node) ProposeMerge(ctx context.Context, info pb.MergeInfo) error {
+	data, err := info.Marshal()
+	if err != nil {
+		return err
+	}
+
+	return n.step(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryMerge, Data: data}}})
 }
 
 func (n *node) Step(ctx context.Context, m pb.Message) error {

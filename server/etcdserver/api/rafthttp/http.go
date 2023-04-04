@@ -402,23 +402,20 @@ func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//}
 	p := h.peerGetter.Get(from)
 	if p == nil {
-		// This may happen in following cases:
-		// 1. user starts a remote peer that belongs to a different cluster
-		// with the same cluster ID.
-		// 2. local etcd falls behind of the cluster, and cannot recognize
-		// the members that joined after its current progress.
 		if urls := r.Header.Get("X-PeerURLs"); urls != "" {
-			h.tr.AddRemote(from, strings.Split(urls, ","))
+			h.tr.AddPeer(from, strings.Split(urls, ","))
+			p = h.peerGetter.Get(from)
+		} else {
+			h.lg.Warn(
+				"failed to find remote peer in cluster",
+				zap.String("local-member-id", h.tr.ID.String()),
+				zap.String("remote-peer-id-stream-handler", h.id.String()),
+				zap.String("remote-peer-id-from", from.String()),
+				zap.String("cluster-id", h.cid.String()),
+			)
+			http.Error(w, "error sender not found", http.StatusNotFound)
+			return
 		}
-		h.lg.Warn(
-			"failed to find remote peer in cluster",
-			zap.String("local-member-id", h.tr.ID.String()),
-			zap.String("remote-peer-id-stream-handler", h.id.String()),
-			zap.String("remote-peer-id-from", from.String()),
-			zap.String("cluster-id", h.cid.String()),
-		)
-		http.Error(w, "error sender not found", http.StatusNotFound)
-		return
 	}
 
 	wto := h.id.String()
@@ -496,20 +493,20 @@ func checkClusterCompatibilityFromHeader(lg *zap.Logger, localID types.ID, heade
 		)
 		return errIncompatibleVersion
 	}
-	if gcid := header.Get("X-Etcd-Cluster-ID"); gcid != cid.String() {
-		lg.Warn(
-			"request cluster ID mismatch",
-			zap.String("local-member-id", localID.String()),
-			zap.String("local-member-cluster-id", cid.String()),
-			zap.String("local-member-server-version", localVs),
-			zap.String("local-member-server-minimum-cluster-version", localMinClusterVs),
-			zap.String("remote-peer-server-name", remoteName),
-			zap.String("remote-peer-server-version", remoteVs),
-			zap.String("remote-peer-server-minimum-cluster-version", remoteMinClusterVs),
-			zap.String("remote-peer-cluster-id", gcid),
-		)
-		return errClusterIDMismatch
-	}
+	//if gcid := header.Get("X-Etcd-Cluster-ID"); gcid != cid.String() {
+	//	lg.Warn(
+	//		"request cluster ID mismatch",
+	//		zap.String("local-member-id", localID.String()),
+	//		zap.String("local-member-cluster-id", cid.String()),
+	//		zap.String("local-member-server-version", localVs),
+	//		zap.String("local-member-server-minimum-cluster-version", localMinClusterVs),
+	//		zap.String("remote-peer-server-name", remoteName),
+	//		zap.String("remote-peer-server-version", remoteVs),
+	//		zap.String("remote-peer-server-minimum-cluster-version", remoteMinClusterVs),
+	//		zap.String("remote-peer-cluster-id", gcid),
+	//	)
+	//	return errClusterIDMismatch
+	//}
 	return nil
 }
 

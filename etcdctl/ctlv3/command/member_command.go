@@ -17,6 +17,7 @@ package command
 import (
 	"errors"
 	"fmt"
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"strconv"
 	"strings"
 
@@ -45,6 +46,7 @@ func NewMemberCommand() *cobra.Command {
 	mc.AddCommand(NewMemberListCommand())
 	mc.AddCommand(NewMemberPromoteCommand())
 	mc.AddCommand(NewMemberSplitCommand())
+	mc.AddCommand(NewMemberMergeCommand())
 
 	return mc
 }
@@ -96,7 +98,7 @@ func NewMemberListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "Lists all members in the cluster",
 		Long: `When --write-out is set to simple, this command prints out comma-separated member lists for each endpoint.
-The items in the lists are ID, Status, Name, Peer Addrs, Client Addrs, Is Learner.
+The items in the lists are ID, Progress, Name, Peer Addrs, Client Addrs, Is Learner.
 `,
 
 		Run: memberListCommandFunc,
@@ -132,6 +134,20 @@ func NewMemberSplitCommand() *cobra.Command {
 
 	cc.Flags().BoolVar(&explictLeave, "explict-leave", false, "indicates if members should leave split joint consensus explicitly")
 	cc.Flags().BoolVar(&leave, "leave", false, "indicates if members should leave split joint consensus")
+
+	return cc
+}
+
+// NewMemberMergeCommand returns the cobra command for "member merge".
+func NewMemberMergeCommand() *cobra.Command {
+	cc := &cobra.Command{
+		Use:   "merge <memberEndpoints>",
+		Short: "Merge clusters (identified by member endpoints) into this one",
+		Long: `Merge clusters into this one.
+`,
+
+		Run: memberMergeCommandFunc,
+	}
 
 	return cc
 }
@@ -277,7 +293,7 @@ func memberPromoteCommandFunc(cmd *cobra.Command, args []string) {
 
 func memberSplitCommandFunc(cmd *cobra.Command, args []string) {
 	if len(args) < 1 {
-		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("member IDs is not provided"))
+		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("member IDs are not provided"))
 	}
 
 	idStrs := strings.Split(args[0], ",")
@@ -292,6 +308,42 @@ func memberSplitCommandFunc(cmd *cobra.Command, args []string) {
 
 	ctx, cancel := commandCtx(cmd)
 	_, err := mustClientFromCmd(cmd).MemberSplit(ctx, ids, explictLeave, leave)
+	cancel()
+	if err != nil {
+		cobrautl.ExitWithError(cobrautl.ExitError, err)
+	}
+}
+
+func memberMergeCommandFunc(cmd *cobra.Command, args []string) {
+	if len(args) < 1 {
+		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("member URLs are not provided"))
+	}
+
+	ctx, cancel := commandCtx(cmd)
+
+	urlStrs := strings.Split(args[0], ",")
+	clusters := map[uint64]*etcdserverpb.MemberList{}
+	for _, url := range urlStrs {
+		client, err := clientv3.New(clientv3.Config{Endpoints: []string{url}})
+		if err != nil {
+			cobrautl.ExitWithError(cobrautl.ExitBadArgs,
+				fmt.Errorf("cannot create client by url (%v): %v", url, err))
+		}
+
+		resp, err := client.MemberList(ctx)
+		if err != nil {
+			cobrautl.ExitWithError(cobrautl.ExitBadArgs,
+				fmt.Errorf("cannot list member by url (%v): %v", url, err))
+		}
+		if len(resp.Members) == 0 {
+			cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("no member exists by url (%v)", url))
+		}
+
+		clusters[resp.Header.ClusterId] = &etcdserverpb.MemberList{
+			Members: append([]*etcdserverpb.Member{}, resp.Members...)}
+	}
+
+	_, err := mustClientFromCmd(cmd).MemberMerge(ctx, clusters)
 	cancel()
 	if err != nil {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)

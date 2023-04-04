@@ -215,3 +215,7 @@ func (cp *clusterProxy) MemberPromote(ctx context.Context, r *pb.MemberPromoteRe
 func (cp *clusterProxy) MemberSplit(ctx context.Context, request *pb.MemberSplitRequest) (*pb.MemberSplitResponse, error) {
 	return nil, errors.New("not implemented")
 }
+
+func (cp *clusterProxy) MemberMerge(ctx context.Context, request *pb.MemberMergeRequest) (*pb.MemberMergeResponse, error) {
+	return nil, errors.New("not implemented")
+}

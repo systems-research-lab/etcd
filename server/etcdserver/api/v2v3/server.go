@@ -99,6 +99,10 @@ func (s *v2v3Server) SplitMember(ctx context.Context, ids []uint64, explicitLeav
 	panic("unimplemented!")
 }
 
+func (s *v2v3Server) MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]*membership.Member, error) {
+	panic("unimplemented!")
+}
+
 func v3MembersToMembership(v3membs []*pb.Member) []*membership.Member {
 	membs := make([]*membership.Member, len(v3membs))
 	for i, m := range v3membs {

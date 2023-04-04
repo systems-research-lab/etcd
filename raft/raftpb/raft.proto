@@ -16,6 +16,7 @@ enum EntryType {
 	EntryNormal       = 0;
 	EntryConfChange   = 1; // corresponds to pb.ConfChange
 	EntryConfChangeV2 = 2; // corresponds to pb.ConfChangeV2
+	EntryMerge        = 3;
 }
 
 message Entry {
@@ -61,6 +62,12 @@ enum MessageType {
 	MsgPreVoteResp     = 18;
 	MsgPull            = 19;
 	MsgPullResp				 = 20;
+	MsgMergePrepare    = 21;
+	MsgMergePrepareYes = 22;
+	MsgMergePrepareNo  = 23;
+	MsgMergeCommit     = 24;
+	MsgMergeAbort      = 25;
+	MsgMergeAck        = 26;
 }
 
 message Message {
@@ -217,3 +224,64 @@ message ConfMetadata {
 	optional uint64    index      = 2 [(gogoproto.nullable) = false];
 	optional uint64    term       = 3 [(gogoproto.nullable) = false];
 }
+
+enum MergeInfoType {
+	Prepare	  = 0;
+	Prepared  = 1;
+	Commit 	  = 2;
+	Abort		  = 3;
+	Ack = 5;
+}
+
+message Cluster {
+	required uint64 id 		 = 1 [(gogoproto.nullable) = false];
+	repeated bytes members = 2 [(gogoproto.nullable) = false];
+}
+
+message MergeInfo {
+	required MergeInfoType type = 1 [(gogoproto.nullable) = false];
+	required string txid        = 2 [(gogoproto.nullable) = false];
+	required uint64 coordinator = 3 [(gogoproto.nullable) = false];
+	repeated Cluster clusters 	= 4 [(gogoproto.nullable) = false];
+}
+
+//message MergeContext {
+//	string txid                  = 1;
+//	uint64 coordinator           = 2;
+//	map<uint64, Member> clusters = 3 [(gogoproto.nullable) = false];
+//}
+//
+//enum MergeEntryType {
+//	Prepare	  = 0;
+//	Commit 	  = 1;
+//	Abort		  = 2;
+//	AckCommit = 3;
+//	AckAbort  = 4;
+//}
+//
+//message MergeEntry {
+//	MergeEntryType type  = 1;
+//	string txid          = 2;
+//	MergeContext Context = 3 [(gogoproto.nullable) = false];
+//}
+//
+//enum MergeTxPhase {
+//	prepareYes = 0;
+//	prepareNo  = 1;
+//	committed  = 2;
+//	aborted    = 3;
+//
+//	ackedCommit = 4;
+//	ackedAbort  = 5;
+//}
+//
+//message MergeTxState {
+//	MergeTxPhase phase          = 1;
+//	map<uint64, bool> progress  = 2 [(gogoproto.nullable) = false];
+//}
+//
+//message MergeTxStore {
+//	string Ongoing = 1;
+//	map<string, MergeTxState> States = 2 [(gogoproto.nullable) = false];
+//	map<string, MergeContext> Contexts = 3 [(gogoproto.nullable) = false];
+//}

@@ -113,6 +113,14 @@ func (cs *ClusterServer) MemberSplit(ctx context.Context, r *pb.MemberSplitReque
 	return &pb.MemberSplitResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
 }
 
+func (cs *ClusterServer) MemberMerge(ctx context.Context, r *pb.MemberMergeRequest) (*pb.MemberMergeResponse, error) {
+	membs, err := cs.server.MergeMember(ctx, *r)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.MemberMergeResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
+}
+
 func (cs *ClusterServer) header() *pb.ResponseHeader {
 	return &pb.ResponseHeader{ClusterId: uint64(cs.cluster.ID()), MemberId: uint64(cs.server.ID()), RaftTerm: cs.server.Term()}
 }

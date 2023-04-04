@@ -31,6 +31,7 @@ type (
 	MemberUpdateResponse  pb.MemberUpdateResponse
 	MemberPromoteResponse pb.MemberPromoteResponse
 	MemberSplitResponse   pb.MemberPromoteResponse
+	MemberMergeResponse   pb.MemberMergeResponse
 )
 
 type Cluster interface {
@@ -53,6 +54,8 @@ type Cluster interface {
 	MemberPromote(ctx context.Context, id uint64) (*MemberPromoteResponse, error)
 
 	MemberSplit(ctx context.Context, ids []uint64, explictLeave, leave bool) (*MemberSplitResponse, error)
+
+	MemberMerge(ctx context.Context, clusters map[uint64]*pb.MemberList) (*MemberMergeResponse, error)
 }
 
 type cluster struct {
@@ -150,4 +153,13 @@ func (c *cluster) MemberSplit(ctx context.Context, ids []uint64, explictLeave, l
 		return nil, toErr(ctx, err)
 	}
 	return (*MemberSplitResponse)(resp), nil
+}
+
+func (c *cluster) MemberMerge(ctx context.Context, clusters map[uint64]*pb.MemberList) (*MemberMergeResponse, error) {
+	r := &pb.MemberMergeRequest{Clusters: clusters}
+	resp, err := c.remote.MemberMerge(ctx, r, c.callOpts...)
+	if err != nil {
+		return nil, toErr(ctx, err)
+	}
+	return (*MemberMergeResponse)(resp), nil
 }

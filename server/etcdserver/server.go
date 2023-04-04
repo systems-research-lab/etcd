@@ -172,6 +172,8 @@ type Server interface {
 
 	SplitMember(ctx context.Context, ids []uint64, explicitLeave, leave bool) ([]*membership.Member, error)
 
+	MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]*membership.Member, error)
+
 	// ClusterVersion is the cluster-wide minimum major.minor version.
 	// Cluster version is set to the min version that an etcd member is
 	// compatible with when first bootstrap.
@@ -297,6 +299,8 @@ type EtcdServer struct {
 	corruptionChecker CorruptionChecker
 
 	appliedConfEntry map[string]struct{}
+
+	m merger
 }
 
 type backendHooks struct {
@@ -700,6 +704,18 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 	}
 	srv.r.transport = tr
 
+	srv.m = merger{
+		id:        srv.id,
+		rn:        srv.r.Node,
+		kv:        srv.kv,
+		applierV3: srv.applyV3,
+		transport: srv.r.transport,
+		cluster:   srv.cluster,
+		msgChan:   make(chan raftpb.Message),
+		lg:        srv.lg,
+	}
+	srv.m.run()
+
 	return srv, nil
 }
 
@@ -982,6 +998,16 @@ func (s *EtcdServer) Process(ctx context.Context, m raftpb.Message) error {
 	//	)
 	//	return httptypes.NewHTTPError(http.StatusForbidden, "cannot process message from removed member")
 	//}
+	if m.Type == raftpb.MsgMergePrepare ||
+		m.Type == raftpb.MsgMergePrepareYes ||
+		m.Type == raftpb.MsgMergePrepareNo ||
+		m.Type == raftpb.MsgMergeCommit ||
+		m.Type == raftpb.MsgMergeAbort ||
+		m.Type == raftpb.MsgMergeAck {
+		s.m.msgChan <- m
+		return nil
+	}
+
 	if m.Type == raftpb.MsgApp {
 		s.stats.RecvAppendReq(types.ID(m.From).String(), m.Size())
 	}
@@ -1785,6 +1811,10 @@ func (s *EtcdServer) SplitMember(ctx context.Context, ids []uint64, explictLeave
 	return nil, nil
 }
 
+func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]*membership.Member, error) {
+	return nil, s.m.proposeMerge(ctx, r)
+}
+
 // promoteMember checks whether the to-be-promoted learner node is ready before sending the promote
 // request to raft.
 // The function returns ErrNotLeader if the local node is not raft leader (therefore does not have
@@ -2272,8 +2302,13 @@ func (s *EtcdServer) apply(
 			shouldStop = shouldStop || removedSelf
 			s.w.Trigger(cc.ID, &confChangeResponse{s.cluster.Members(), err})
 
-		case raftpb.EntryConfChangeV2:
+		case raftpb.EntryConfChangeV2: // used by split
 			s.applyConfChangeV2(e)
+			s.setAppliedIndex(e.Index)
+			s.setTerm(e.Term)
+
+		case raftpb.EntryMerge:
+			s.m.apply(e)
 			s.setAppliedIndex(e.Index)
 			s.setTerm(e.Term)
 

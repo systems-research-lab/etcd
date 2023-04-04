@@ -187,6 +187,10 @@ func (rcc *retryClusterClient) MemberSplit(ctx context.Context, in *pb.MemberSpl
 	return rcc.cc.MemberSplit(ctx, in, opts...)
 }
 
+func (rcc *retryClusterClient) MemberMerge(ctx context.Context, in *pb.MemberMergeRequest, opts ...grpc.CallOption) (resp *pb.MemberMergeResponse, err error) {
+	return rcc.cc.MemberMerge(ctx, in, opts...)
+}
+
 type retryMaintenanceClient struct {
 	mc pb.MaintenanceClient
 }
