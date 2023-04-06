@@ -202,6 +202,67 @@ func (c Changer) LeaveSplit() (tracker.Config, tracker.ProgressMap, error) {
 	return checkAndReturn(cfg, prs)
 }
 
+func (c Changer) EnterMerge(autoLeave bool, ccs ...pb.ConfChangeSingle) (
+	tracker.Config, tracker.ProgressMap, error) {
+	cfg, prs, err := c.checkAndCopy()
+	if err != nil {
+		return c.err(err)
+	}
+	if joint(cfg) {
+		err := errors.New("config is already joint")
+		return c.err(err)
+	}
+	if len(cfg.Voters[0]) == 0 {
+		// We allow adding nodes to an empty config for convenience (testing and
+		// bootstrap), but you can't enter a joint state.
+		err := errors.New("can't make a zero-voter config joint")
+		return c.err(err)
+	}
+
+	// add nodes to cfg.Voters[1]
+	*outgoingPtr(&cfg.Voters) = quorum.MajorityConfig{}
+	for _, cc := range ccs {
+		outgoing(cfg.Voters)[cc.NodeID] = struct{}{}
+		prs[cc.NodeID] = &tracker.Progress{
+			Next:         c.LastIndex,
+			Match:        0,
+			Inflights:    tracker.NewInflights(c.Tracker.MaxInflight),
+			IsLearner:    false,
+			RecentActive: true,
+		}
+	}
+
+	if err := c.apply(&cfg, prs, ccs...); err != nil {
+		return c.err(err)
+	}
+
+	cfg.AutoLeave = autoLeave
+	return checkAndReturn(cfg, prs)
+}
+
+func (c Changer) LeaveMerge() (tracker.Config, tracker.ProgressMap, error) {
+	cfg, prs, err := c.checkAndCopy()
+	if err != nil {
+		return c.err(err)
+	}
+	if !joint(cfg) {
+		err := errors.New("can't leave a non-joint config")
+		return c.err(err)
+	}
+	if len(outgoing(cfg.Voters)) == 0 {
+		err := fmt.Errorf("configuration is not joint: %v", cfg)
+		return c.err(err)
+	}
+
+	for id := range outgoing(cfg.Voters) {
+		incoming(cfg.Voters)[id] = struct{}{}
+	}
+	*outgoingPtr(&cfg.Voters) = nil
+
+	cfg.AutoLeave = false
+	return checkAndReturn(cfg, prs)
+}
+
 // Simple carries out a series of configuration changes that (in aggregate)
 // mutates the incoming majority config Voters[0] by at most one. This method
 // will return an error if that is not the case, if the resulting quorum is
@@ -246,6 +307,7 @@ func (c Changer) apply(cfg *tracker.Config, prs tracker.ProgressMap, ccs ...pb.C
 			c.remove(cfg, prs, cc.NodeID)
 		case pb.ConfChangeUpdateNode:
 		case pb.ConfChangeSplitNode:
+		case pb.ConfChangeMergeNode:
 		default:
 			return fmt.Errorf("unexpected conf type %d", cc.Type)
 		}

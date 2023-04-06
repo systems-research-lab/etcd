@@ -17,7 +17,7 @@ package raft
 import (
 	"context"
 	"errors"
-
+	"fmt"
 	pb "go.etcd.io/etcd/raft/v3/raftpb"
 )
 
@@ -365,6 +365,102 @@ func (n *node) run() {
 				r.Step(m)
 			}
 		case cc := <-n.confc:
+			if cc.Transition == pb.ConfChangeMerge {
+				// get next epoch
+				ents, err := r.raftLog.entries(r.raftLog.lastIndex(), noLimit)
+				if err != nil {
+					panic(fmt.Errorf("failed to get last entry: %v", err))
+				}
+				nextEpoch := ents[0].Epoch + 1
+
+				// entries for new epoch
+
+				// reset storage
+				storage, ok := r.raftLog.storage.(*MemoryStorage)
+				if !ok {
+					panic("storage type is not *MemoryStorage")
+				}
+				storage.Lock()
+				storage.hardState = pb.HardState{Epoch: nextEpoch}
+				storage.snapshot = pb.Snapshot{
+					Metadata: pb.SnapshotMetadata{
+						ConfState: pb.ConfState{
+							Voters: r.prs.ConfState().Voters,
+							Quorum: r.prs.ConfState().Quorum,
+						},
+					},
+				}
+				storage.ents = make([]pb.Entry, 1)
+				storage.prevconfstate = pb.ConfMetadata{}
+				storage.currconfstate = pb.ConfMetadata{}
+				storage.Unlock()
+
+				// reset raft
+				n.rn, err = NewRawNode(&Config{
+					ID:                        r.id,
+					ElectionTick:              r.electionTimeout,
+					HeartbeatTick:             r.heartbeatTimeout,
+					Storage:                   storage,
+					Applied:                   0,
+					MaxSizePerMsg:             r.maxMsgSize,
+					MaxCommittedSizePerReady:  r.raftLog.maxNextEntsSize,
+					MaxUncommittedEntriesSize: r.maxUncommittedSize,
+					MaxInflightMsgs:           r.prs.MaxInflight,
+					CheckQuorum:               r.checkQuorum,
+					PreVote:                   r.preVote,
+					ReadOnlyOption:            r.readOnly.option,
+					Logger:                    r.logger,
+					DisableProposalForwarding: r.disableProposalForwarding,
+				})
+				r = n.rn.raft
+				r.Epoch = nextEpoch
+				r.becomeFollower(1, None)
+				r.logger.Infof("epoch changed to %v", r.Epoch)
+
+				cc = pb.ConfChangeV2{
+					Transition: pb.ConfChangeMergeEnter,
+					Changes:    cc.Changes,
+					Context:    cc.Context, // context is pb.MergeInfo
+					ConfIndex:  1,
+					ConfTerm:   1,
+				}
+				data, err := cc.Marshal()
+				if err != nil {
+					panic(fmt.Sprintf("failed marshal merge conf change: %v", err))
+				}
+
+				// append logs for new epoch
+				entries := []pb.Entry{
+					{
+						Epoch: r.Epoch,
+						Term:  1,
+						Index: 1,
+						Type:  pb.EntryMergeConfChange,
+						Data:  data,
+					},
+					{ // special entry for request snapshot
+						Epoch: r.Epoch,
+						Term:  1,
+						Index: 2,
+						Type:  pb.EntryMergeSnap,
+						Data:  cc.Context, // context is pb.MergeInfo
+					},
+				}
+				r.raftLog.append(entries...)
+				if err = storage.Append(entries); err != nil {
+					panic(err)
+				}
+				r.raftLog.commitTo(r.raftLog.lastIndex())
+				r.raftLog.stableTo(r.raftLog.lastIndex(), r.raftLog.lastTerm())
+
+				select {
+				case n.confstatec <- pb.ConfState{}:
+				case <-n.done:
+				}
+
+				continue
+			}
+
 			_, okBefore := r.prs.Progress[r.id]
 			cs := r.applyConfChange(cc)
 			// If the node was removed, block incoming proposals. Note that we
@@ -436,7 +532,7 @@ func (n *node) ProposeMerge(ctx context.Context, info pb.MergeInfo) error {
 		return err
 	}
 
-	return n.step(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryMerge, Data: data}}})
+	return n.step(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryMergeTx, Data: data}}})
 }
 
 func (n *node) Step(ctx context.Context, m pb.Message) error {

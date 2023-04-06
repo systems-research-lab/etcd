@@ -16,7 +16,9 @@ enum EntryType {
 	EntryNormal       = 0;
 	EntryConfChange   = 1; // corresponds to pb.ConfChange
 	EntryConfChangeV2 = 2; // corresponds to pb.ConfChangeV2
-	EntryMerge        = 3;
+	EntryMergeTx         = 3;
+	EntryMergeConfChange = 4;
+	EntryMergeSnap       = 5;
 }
 
 message Entry {
@@ -68,6 +70,8 @@ enum MessageType {
 	MsgMergeCommit     = 24;
 	MsgMergeAbort      = 25;
 	MsgMergeAck        = 26;
+	MsgMergeSnapReq    = 27;
+	MsgMergeSnapResp   = 28;
 }
 
 message Message {
@@ -124,6 +128,12 @@ enum ConfChangeTransition {
 	ConfChangeTransitionSplitExplicit = 5;
 	// Leave joint consensus for split
 	ConfChangeTransitionSplitLeave = 6;
+	// Start merge conf change
+	ConfChangeMerge = 7;
+	// Enter joint consensus for merge
+	ConfChangeMergeEnter = 8;
+	// Enter joint consensus for merge
+	ConfChangeMergeLeave = 9;
 }
 
 message ConfState {
@@ -153,6 +163,7 @@ enum ConfChangeType {
 	ConfChangeUpdateNode     = 2;
 	ConfChangeSplitNode      = 3;
 	ConfChangeAddLearnerNode = 4;
+	ConfChangeMergeNode      = 5;
 }
 
 message ConfChange {

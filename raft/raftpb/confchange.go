@@ -126,6 +126,14 @@ func (c ConfChangeV2) LeaveSplit() bool {
 	return c.Transition == ConfChangeTransitionSplitLeave
 }
 
+func (c ConfChangeV2) EnterMerge() bool {
+	return c.Transition == ConfChangeMergeEnter
+}
+
+func (c ConfChangeV2) LeaveMerge() bool {
+	return c.Transition == ConfChangeMergeLeave
+}
+
 // ConfChangesFromString parses a Space-delimited sequence of operations into a
 // slice of ConfChangeSingle. The supported operations are:
 // - vn: make n a voter,

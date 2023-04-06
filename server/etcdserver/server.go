@@ -15,7 +15,9 @@
 package etcdserver
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"expvar"
 	"fmt"
@@ -357,7 +359,7 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 	}
 
 	if terr := fileutil.TouchDirAll(cfg.DataDir); terr != nil {
-		return nil, fmt.Errorf("cannot access data directory: %v", terr)
+		return nil, fmt.Errorf("cannot access Data directory: %v", terr)
 	}
 
 	haveWAL := wal.Exist(cfg.WALDir())
@@ -708,6 +710,7 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		id:        srv.id,
 		rn:        srv.r.Node,
 		kv:        srv.kv,
+		dataDir:   srv.Cfg.DataDir,
 		applierV3: srv.applyV3,
 		transport: srv.r.transport,
 		cluster:   srv.cluster,
@@ -999,11 +1002,10 @@ func (s *EtcdServer) Process(ctx context.Context, m raftpb.Message) error {
 	//	return httptypes.NewHTTPError(http.StatusForbidden, "cannot process message from removed member")
 	//}
 	if m.Type == raftpb.MsgMergePrepare ||
-		m.Type == raftpb.MsgMergePrepareYes ||
-		m.Type == raftpb.MsgMergePrepareNo ||
-		m.Type == raftpb.MsgMergeCommit ||
-		m.Type == raftpb.MsgMergeAbort ||
-		m.Type == raftpb.MsgMergeAck {
+		m.Type == raftpb.MsgMergePrepareYes || m.Type == raftpb.MsgMergePrepareNo ||
+		m.Type == raftpb.MsgMergeCommit || m.Type == raftpb.MsgMergeAbort ||
+		m.Type == raftpb.MsgMergeAck ||
+		m.Type == raftpb.MsgMergeSnapReq || m.Type == raftpb.MsgMergeSnapResp {
 		s.m.msgChan <- m
 		return nil
 	}
@@ -1155,7 +1157,7 @@ func (s *EtcdServer) run() {
 			s.revokeExpiredLeases(leases)
 		case err := <-s.errorc:
 			lg.Warn("server error", zap.Error(err))
-			lg.Warn("data-dir used by this member must be removed")
+			lg.Warn("Data-dir used by this member must be removed")
 			return
 		case <-getSyncC():
 			if s.v2store.HasTTLKeys() {
@@ -1224,7 +1226,43 @@ func (s *EtcdServer) Cleanup() {
 	}
 }
 
+func (s *EtcdServer) reset(ep *etcdProgress) {
+	*ep = etcdProgress{
+		confState: ep.confState,
+		snapi:     0,
+		appliedt:  0,
+		appliedi:  0,
+	}
+
+	s.consistIndex.SetConsistentIndex(1, 1)
+	s.consistIndex.SetConsistentApplyingIndex(1, 1)
+
+	tx := s.be.BatchTx()
+	tx.Lock()
+	s.consistIndex.UnsafeSave(tx)
+	tx.Unlock()
+	tx.Commit()
+	s.be.ForceCommit()
+
+	i, t := s.consistIndex.ConsistentApplyingIndex()
+	s.lg.Info("reset consistent index",
+		zap.Uint64("consistent index", s.consistIndex.ConsistentIndex()),
+		zap.Any("consistent applying index", i),
+		zap.Any("consistent applying index", t))
+}
+
 func (s *EtcdServer) applyAll(ep *etcdProgress, apply *apply) {
+	for _, ent := range apply.entries {
+		if ent.Type == raftpb.EntryMergeConfChange {
+			var cc raftpb.ConfChangeV2
+			pbutil.MustUnmarshal(&cc, ent.Data)
+			if cc.Transition == raftpb.ConfChangeMergeEnter {
+				s.reset(ep)
+				s.lg.Info("reset etcd progress and consist index")
+			}
+		}
+	}
+
 	s.applySnapshot(ep, apply)
 	s.applyConfChangeEnts(apply)
 	s.applyEntries(ep, apply)
@@ -2307,10 +2345,62 @@ func (s *EtcdServer) apply(
 			s.setAppliedIndex(e.Index)
 			s.setTerm(e.Term)
 
-		case raftpb.EntryMerge:
+		case raftpb.EntryMergeTx:
 			s.m.apply(e)
 			s.setAppliedIndex(e.Index)
 			s.setTerm(e.Term)
+
+		case raftpb.EntryMergeConfChange:
+			var cc raftpb.ConfChangeV2
+			pbutil.MustUnmarshal(&cc, e.Data)
+			cc.ConfTerm = e.Term
+			cc.ConfIndex = e.Index
+			s.m.enterJoint(cc)
+
+			s.setAppliedIndex(e.Index)
+			s.setTerm(e.Term)
+
+		case raftpb.EntryMergeSnap:
+			var info raftpb.MergeInfo
+			pbutil.MustUnmarshal(&info, e.Data)
+
+			semsize := len(info.Clusters) - 1
+			sem := make(chan MergeSnapshot, semsize)
+			s.lg.Debug("check snapshots", zap.Int("semsize", semsize))
+			for _, clr := range info.Clusters {
+				if clr.Id == uint64(s.cluster.ID()) {
+					continue
+				}
+				go func(cid types.ID) {
+					for !s.m.isSnapFileExists(cid) {
+						time.Sleep(10 * time.Millisecond)
+						continue
+					}
+
+					var snapshot MergeSnapshot
+					if err := gob.NewDecoder(bytes.NewBuffer(s.m.mustReadSnapFile(cid))).
+						Decode(&snapshot); err != nil {
+						panic(fmt.Errorf("decode snapshot file of cluster %s failed: %v", cid, err))
+					}
+					sem <- snapshot
+					s.lg.Debug("received one snapshot", zap.Stringer("cluster", cid))
+				}(types.ID(clr.Id))
+			}
+
+			snapshots := make([]MergeSnapshot, 0)
+			for idx := 0; idx < semsize; idx++ {
+				snapshots = append(snapshots, <-sem)
+			}
+			s.lg.Debug("received all snapshots")
+
+			txn := s.kv.Write(traceutil.Get(context.Background()))
+			for _, ss := range snapshots {
+				for _, kv := range ss {
+					txn.Put(kv.Key, kv.Value, lease.NoLease)
+				}
+			}
+			txn.End()
+			s.lg.Debug("installed all snapshots")
 
 		default:
 			lg := s.Logger()

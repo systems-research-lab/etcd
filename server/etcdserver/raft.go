@@ -295,7 +295,7 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 
 				if !raft.IsEmptySnap(rd.Snapshot) {
 					// Force WAL to fsync its hard state before Release() releases
-					// old data from the WAL. Otherwise could get an error like:
+					// old Data from the WAL. Otherwise could get an error like:
 					// panic: tocommit(107) is out of range [lastIndex(84)]. Was the raft log corrupted, truncated, or lost?
 					// See https://github.com/etcd-io/etcd/issues/10219 for more details.
 					if err := r.storage.Sync(); err != nil {
@@ -371,20 +371,20 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 //
 // etcd responds to the client once it finishes (actually partially)
 // the applying workflow. But when the client receives the response,
-// it doesn't mean etcd has already successfully saved the data,
+// it doesn't mean etcd has already successfully saved the Data,
 // including BoltDB and WAL, because:
 //  1. etcd commits the boltDB transaction periodically instead of on each request;
 //  2. etcd saves WAL entries in parallel with applying the committed entries.
 //
-// Accordingly, it might run into a situation of data loss when the etcd crashes
+// Accordingly, it might run into a situation of Data loss when the etcd crashes
 // immediately after responding to the client and before the boltDB and WAL
-// successfully save the data to disk.
+// successfully save the Data to disk.
 // Note that this issue can only happen for clusters with only one member.
 //
 // For clusters with multiple members, it isn't an issue, because etcd will
-// not commit & apply the data before it being replicated to majority members.
-// When the client receives the response, it means the data must have been applied.
-// It further means the data must have been committed.
+// not commit & apply the Data before it being replicated to majority members.
+// When the client receives the response, it means the Data must have been applied.
+// It further means the Data must have been committed.
 // Note: for clusters with multiple members, the raft will never send identical
 // unstable entries and committed entries to etcdserver.
 //
@@ -431,7 +431,7 @@ func (r *raftNode) processMessages(ms []raftpb.Message) []raftpb.Message {
 		}
 
 		if ms[i].Type == raftpb.MsgSnap {
-			// There are two separate data store: the store for v2, and the KV for v3.
+			// There are two separate Data store: the store for v2, and the KV for v3.
 			// The msgSnap only contains the most recent snapshot of store without KV.
 			// So we need to redirect the msgSnap to etcd server main loop for merging in the
 			// current store snapshot and KV snapshot.
@@ -492,7 +492,7 @@ func (r *raftNode) resumeSending() {
 
 // advanceTicks advances ticks of Raft node.
 // This can be used for fast-forwarding election
-// ticks in multi data-center deployments, thus
+// ticks in multi Data-center deployments, thus
 // speeding up election process.
 func (r *raftNode) advanceTicks(ticks int) {
 	for i := 0; i < ticks; i++ {

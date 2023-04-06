@@ -1,12 +1,14 @@
 package etcdserver
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/gob"
 	"fmt"
 	"github.com/google/uuid"
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/pkg/v3/pbutil"
 	"go.etcd.io/etcd/pkg/v3/traceutil"
@@ -17,6 +19,7 @@ import (
 	"go.etcd.io/etcd/server/v3/lease"
 	"go.etcd.io/etcd/server/v3/mvcc"
 	"go.uber.org/zap"
+	"os"
 	"strings"
 	"time"
 )
@@ -54,11 +57,13 @@ type merger struct {
 	id        types.ID
 	rn        raft.Node
 	kv        mvcc.KV
+	dataDir   string
 	applierV3 applierV3
 	cluster   *membership.RaftCluster
 	transport rafthttp.Transporter
 	Lessor    lease.Lessor
 	msgChan   chan raftpb.Message
+	snapChan  chan struct{}
 
 	lg *zap.Logger
 }
@@ -244,14 +249,15 @@ func (m *merger) apply(entry raftpb.Entry) {
 			txs.Progress[m.cluster.ID()] = struct{}{}
 			txs.Info.Type = raftpb.Commit
 
+			if txs.Info.Coordinator != uint64(m.cluster.ID()) {
+				m.applyMergeConfChange(txs.Clusters, info)
+				store.Ongoing = uuid.Nil
+			}
+
 			m.lg.Debug("committed merge tx",
 				zap.String("txid", txid.String()),
 				zap.Any("phase", txs.Phase),
 				zap.Any("clusters", txs.Clusters))
-
-			if txs.Info.Coordinator != uint64(m.cluster.ID()) {
-				store.Ongoing = uuid.Nil
-			}
 		}
 
 		store.States[txid] = txs
@@ -287,6 +293,11 @@ func (m *merger) apply(entry raftpb.Entry) {
 				panic(fmt.Sprintf("invalid state %v to ack tx %v", txs.Phase, txid))
 			}
 
+			if txs.Info.Coordinator != uint64(m.cluster.ID()) {
+				panic("ack commit by a non-coordinator cluster")
+			}
+			m.applyMergeConfChange(txs.Clusters, txs.Info)
+
 			txs.Info.Type = raftpb.Ack
 			store.Ongoing = uuid.Nil
 
@@ -302,11 +313,142 @@ func (m *merger) apply(entry raftpb.Entry) {
 	m.putTxStore(store)
 }
 
+func (m *merger) applyMergeConfChange(clusters map[types.ID][]pb.Member, info raftpb.MergeInfo) {
+	m.lg.Debug("ready to apply merge", zap.String("txid", info.Txid))
+
+	// add to cluster membership
+	changes := make([]raftpb.ConfChangeSingle, 0)
+	for cid, members := range clusters {
+		if cid == m.cluster.ID() {
+			continue
+		}
+		for _, mem := range members {
+			m.cluster.AddMember(&membership.Member{
+				ID: types.ID(mem.ID),
+				RaftAttributes: membership.RaftAttributes{
+					PeerURLs:  mem.PeerURLs,
+					IsLearner: false,
+				},
+				Attributes: membership.Attributes{
+					Name:       mem.Name,
+					ClientURLs: mem.ClientURLs,
+				},
+			}, membership.ApplyBoth)
+
+			changes = append(changes, raftpb.ConfChangeSingle{
+				Type:   raftpb.ConfChangeMergeNode,
+				NodeID: mem.ID,
+			})
+		}
+	}
+
+	// add to raft membership
+	m.rn.ApplyConfChange(raftpb.ConfChangeV2{
+		Transition: raftpb.ConfChangeMerge,
+		Changes:    changes,
+		Context:    pbutil.MustMarshal(&info),
+	})
+	m.lg.Debug("applied merge", zap.String("txid", info.Txid))
+
+	// take a snapshot of Data
+	go m.snapshotter()
+
+	// start a snapshot requester
+	go m.snapshotRequester(clusters)
+}
+
+type MergeSnapshot []mvccpb.KeyValue
+
+func (m *merger) snapFilepath(clusterId types.ID) string {
+	return m.dataDir + "/" + "merge-" + clusterId.String() + ".snap"
+}
+
+func (m *merger) isSnapFileExists(clusterId types.ID) bool {
+	_, err := os.Stat(m.snapFilepath(clusterId))
+	return !os.IsNotExist(err)
+}
+
+func (m *merger) mustReadSnapFile(clusterId types.ID) []byte {
+	data, err := os.ReadFile(m.snapFilepath(clusterId))
+	if err != nil {
+		panic(fmt.Errorf("read snap file %s failed %v", clusterId, err))
+	}
+	return data
+}
+
+func (m *merger) mustWriteSnapFile(clusterId types.ID, data []byte) {
+	if err := os.WriteFile(m.snapFilepath(clusterId), data, 0644); err != nil {
+		panic(err)
+	}
+}
+
+func (m merger) snapshotter() {
+	txn := m.kv.Read(mvcc.ConcurrentReadTxMode, traceutil.Get(context.Background()))
+	rr, err := txn.Range(context.Background(), []byte{0}, []byte{}, mvcc.RangeOptions{})
+	if err != nil {
+		txn.End()
+		panic(fmt.Errorf("cannot read tx store: %v", err))
+	}
+	txn.End()
+
+	snapfile, err := os.Create(m.snapFilepath(m.cluster.ID()))
+	defer func() {
+		if err := snapfile.Close(); err != nil {
+			panic(fmt.Errorf("close file failed: %v", err))
+		}
+	}()
+	if err != nil {
+		panic(fmt.Errorf("create snap file failed: %v", err))
+	}
+	w := bufio.NewWriter(snapfile)
+	if err = gob.NewEncoder(w).Encode(MergeSnapshot(rr.KVs)); err != nil {
+		panic(fmt.Errorf("encode snapshot kv failed: %v", err))
+	}
+	if err = w.Flush(); err != nil {
+		panic(fmt.Errorf("flush snap failed: %v", err))
+	}
+}
+
+func (m merger) snapshotRequester(clusters map[types.ID][]pb.Member) {
+	exists := make(map[types.ID]struct{})
+	for len(exists) != len(clusters) {
+		exists[m.cluster.ID()] = struct{}{}
+		for cid, mems := range clusters {
+			if _, ok := exists[cid]; ok {
+				continue
+			}
+
+			if m.isSnapFileExists(cid) {
+				exists[cid] = struct{}{}
+			} else {
+				reqs := make([]raftpb.Message, 0)
+				for _, member := range mems {
+					reqs = append(reqs, raftpb.Message{
+						Type: raftpb.MsgMergeSnapReq,
+						To:   member.ID,
+						From: uint64(m.id),
+					})
+					m.lg.Debug("request merge snap", zap.Stringer("Cid", cid))
+				}
+
+				m.transport.Send(reqs)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+}
+
+func (m *merger) enterJoint(cc raftpb.ConfChangeV2) {
+	m.lg.Debug("ready to enter merge joint")
+	m.rn.ApplyConfChange(cc)
+	m.lg.Debug("enter merge joint")
+}
+
 func (m *merger) run() {
 	store := m.getTxStore(context.Background())
 	if store.Ongoing != uuid.Nil {
 		// Should only happen during reboot,
-		// the backend restarts with already most up-to-date data
+		// the backend restarts with already most up-to-date Data
 		m.lg.Debug("restore merge tx", zap.String("txid", store.Ongoing.String()))
 		for _, clr := range store.States[store.Ongoing].Clusters {
 			for _, member := range clr {
@@ -364,14 +506,57 @@ func (m *merger) sender() {
 		}
 
 		// TODO: tweaking
-		time.Sleep(3 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
+}
+
+type snapshotResp struct {
+	Cid  types.ID
+	Data []byte
 }
 
 func (m *merger) handler() {
 	for {
 		msg := <-m.msgChan
-		if m.rn.Status().Lead != uint64(m.id) {
+
+		if msg.Type == raftpb.MsgMergeSnapReq {
+			m.lg.Debug("receive merge snap request", zap.Uint64("from", msg.From))
+
+			if m.isSnapFileExists(m.cluster.ID()) {
+				buf := bytes.Buffer{}
+				if err := gob.NewEncoder(&buf).Encode(snapshotResp{
+					Cid:  m.cluster.ID(),
+					Data: m.mustReadSnapFile(m.cluster.ID()),
+				}); err != nil {
+					m.lg.Panic("encode snapshot resp failed", zap.Error(err))
+					continue
+				}
+
+				m.transport.Send([]raftpb.Message{
+					{
+						Type:    raftpb.MsgMergeSnapResp,
+						To:      msg.From,
+						From:    msg.To,
+						Context: buf.Bytes(),
+					},
+				})
+			}
+			continue
+		} else if msg.Type == raftpb.MsgMergeSnapResp {
+			m.lg.Debug("receive merge snap response", zap.Uint64("from", msg.From))
+
+			var resp snapshotResp
+			if err := gob.NewDecoder(bytes.NewBuffer(msg.Context)).Decode(&resp); err != nil {
+				m.lg.Panic("handle snapshot resp failed", zap.Error(err))
+			}
+
+			if !m.isSnapFileExists(resp.Cid) {
+				m.mustWriteSnapFile(resp.Cid, resp.Data)
+			}
+			continue
+		}
+
+		if m.rn.Status().Lead != raft.None && m.rn.Status().Lead != uint64(m.id) {
 			continue
 		}
 
@@ -497,7 +682,7 @@ func (m *merger) handler() {
 				}
 			}
 			if cid == 0 {
-				m.lg.Debug("unknown cid",
+				m.lg.Debug("unknown Cid",
 					zap.Stringer("type", msg.Type),
 					zap.Uint64("from", msg.From),
 					zap.Stringer("txid", txid))
@@ -548,7 +733,7 @@ func (m *merger) handler() {
 				}
 			}
 			if cid == 0 {
-				m.lg.Debug("unknown cid",
+				m.lg.Debug("unknown Cid",
 					zap.Stringer("type", msg.Type),
 					zap.Uint64("from", msg.From),
 					zap.Stringer("txid", txid))

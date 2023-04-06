@@ -48,6 +48,7 @@ func (rn *RawNode) Bootstrap(peers []Peer) error {
 	// TODO(tbg): remove StartNode and give the application the right tools to
 	// bootstrap the initial membership in a cleaner way.
 	rn.raft.becomeFollower(1, None)
+	rn.raft.Epoch = 1
 	ents := make([]pb.Entry, len(peers))
 	for i, peer := range peers {
 		cc := pb.ConfChange{Type: pb.ConfChangeAddNode, NodeID: peer.ID, Context: peer.Context}
