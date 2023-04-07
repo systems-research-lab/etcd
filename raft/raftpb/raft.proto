@@ -129,11 +129,11 @@ enum ConfChangeTransition {
 	// Leave joint consensus for split
 	ConfChangeTransitionSplitLeave = 6;
 	// Start merge conf change
-	ConfChangeMerge = 7;
+	ConfChangeTransitionMerge = 7;
 	// Enter joint consensus for merge
-	ConfChangeMergeEnter = 8;
+	ConfChangeTransitionMergeEnter = 8;
 	// Enter joint consensus for merge
-	ConfChangeMergeLeave = 9;
+	ConfChangeTransitionMergeLeave = 9;
 }
 
 message ConfState {
@@ -154,7 +154,9 @@ message ConfState {
 	// added by shireen for storing quorum size.
 	optional uint64    quorum      = 6 [(gogoproto.nullable) = false];
 	// If set, the joint config is for split.
-	optional bool to_split = 7 [(gogoproto.nullable) = false];
+	optional bool split = 7 [(gogoproto.nullable) = false];
+	// If set, the joint config is for merge.
+	optional bool merge = 8 [(gogoproto.nullable) = false];
 }
 
 enum ConfChangeType {

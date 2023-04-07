@@ -1,11 +1,11 @@
 package etcdserver
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/gob"
 	"fmt"
+	"github.com/google/renameio"
 	"github.com/google/uuid"
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/mvccpb"
@@ -344,7 +344,7 @@ func (m *merger) applyMergeConfChange(clusters map[types.ID][]pb.Member, info ra
 
 	// add to raft membership
 	m.rn.ApplyConfChange(raftpb.ConfChangeV2{
-		Transition: raftpb.ConfChangeMerge,
+		Transition: raftpb.ConfChangeTransitionMerge,
 		Changes:    changes,
 		Context:    pbutil.MustMarshal(&info),
 	})
@@ -377,7 +377,7 @@ func (m *merger) mustReadSnapFile(clusterId types.ID) []byte {
 }
 
 func (m *merger) mustWriteSnapFile(clusterId types.ID, data []byte) {
-	if err := os.WriteFile(m.snapFilepath(clusterId), data, 0644); err != nil {
+	if err := renameio.WriteFile(m.snapFilepath(clusterId), data, 0644); err != nil {
 		panic(err)
 	}
 }
@@ -391,22 +391,11 @@ func (m merger) snapshotter() {
 	}
 	txn.End()
 
-	snapfile, err := os.Create(m.snapFilepath(m.cluster.ID()))
-	defer func() {
-		if err := snapfile.Close(); err != nil {
-			panic(fmt.Errorf("close file failed: %v", err))
-		}
-	}()
-	if err != nil {
-		panic(fmt.Errorf("create snap file failed: %v", err))
-	}
-	w := bufio.NewWriter(snapfile)
-	if err = gob.NewEncoder(w).Encode(MergeSnapshot(rr.KVs)); err != nil {
+	buf := bytes.Buffer{}
+	if err = gob.NewEncoder(&buf).Encode(MergeSnapshot(rr.KVs)); err != nil {
 		panic(fmt.Errorf("encode snapshot kv failed: %v", err))
 	}
-	if err = w.Flush(); err != nil {
-		panic(fmt.Errorf("flush snap failed: %v", err))
-	}
+	m.mustWriteSnapFile(m.cluster.ID(), buf.Bytes())
 }
 
 func (m merger) snapshotRequester(clusters map[types.ID][]pb.Member) {
@@ -523,10 +512,11 @@ func (m *merger) handler() {
 			m.lg.Debug("receive merge snap request", zap.Uint64("from", msg.From))
 
 			if m.isSnapFileExists(m.cluster.ID()) {
+				data := m.mustReadSnapFile(m.cluster.ID())
 				buf := bytes.Buffer{}
 				if err := gob.NewEncoder(&buf).Encode(snapshotResp{
 					Cid:  m.cluster.ID(),
-					Data: m.mustReadSnapFile(m.cluster.ID()),
+					Data: data,
 				}); err != nil {
 					m.lg.Panic("encode snapshot resp failed", zap.Error(err))
 					continue

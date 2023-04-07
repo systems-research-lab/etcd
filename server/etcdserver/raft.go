@@ -220,23 +220,11 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					}
 				}
 
+				// find conf change entries that appended to log but not committed
 				confChangeEnts := make([]raftpb.Entry, 0)
 				for _, ent := range rd.Entries {
 					if ent.Type == raftpb.EntryConfChange || ent.Type == raftpb.EntryConfChangeV2 {
 						confChangeEnts = append(confChangeEnts, ent)
-					}
-				}
-
-				for _, ent := range append(rd.Entries, rd.CommittedEntries...) {
-					if ent.Type == raftpb.EntryConfChangeV2 {
-						var cc raftpb.ConfChangeV2
-						pbutil.MustUnmarshal(&cc, ent.Data)
-						if cc.Transition == raftpb.ConfChangeTransitionSplitLeave {
-							for _, msg := range rd.Messages {
-								r.lg.Info("leave message", zap.String("msg", msg.String()))
-							}
-							r.lg.Info("leave entry", zap.String("entry", ent.String()))
-						}
 					}
 				}
 

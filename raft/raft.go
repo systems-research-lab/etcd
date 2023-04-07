@@ -588,8 +588,20 @@ func (r *raft) advance(rd Ready) {
 				Type: pb.EntryConfChangeV2,
 				Data: nil,
 			}
-			if r.prs.Config.ToSplit {
-				_, data, err := pb.MarshalConfChange(pb.ConfChangeV2{Transition: pb.ConfChangeTransitionSplitLeave})
+			if r.prs.Config.Split && r.prs.Config.Merge {
+				panic("split and merge at the same time")
+			}
+			if r.prs.Config.Split {
+				_, data, err := pb.MarshalConfChange(pb.ConfChangeV2{
+					Transition: pb.ConfChangeTransitionSplitLeave})
+				if err != nil {
+					panic("marshal split leave entry failed: " + err.Error())
+				}
+				ent.Data = data
+			}
+			if r.prs.Config.Merge {
+				_, data, err := pb.MarshalConfChange(pb.ConfChangeV2{
+					Transition: pb.ConfChangeTransitionMergeLeave})
 				if err != nil {
 					panic("marshal split leave entry failed: " + err.Error())
 				}
@@ -1854,7 +1866,7 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 			return changer.EnterSplit(autoLeave, r.id, cc.Changes...)
 		} else if cc.LeaveSplit() {
 			return changer.LeaveSplit()
-		} else if cc.EnterMerge() {
+		} else if autoLeave, ok = cc.EnterMerge(); ok {
 			return changer.EnterMerge(autoLeave, cc.Changes...)
 		} else if cc.LeaveMerge() {
 			return changer.LeaveMerge()

@@ -173,7 +173,7 @@ func (c Changer) EnterSplit(autoLeave bool, currId uint64, ccs ...pb.ConfChangeS
 	}
 
 	cfg.AutoLeave = autoLeave
-	cfg.ToSplit = true
+	cfg.Split = true
 	return checkAndReturn(cfg, prs)
 }
 
@@ -198,7 +198,7 @@ func (c Changer) LeaveSplit() (tracker.Config, tracker.ProgressMap, error) {
 	*outgoingPtr(&cfg.Voters) = nil
 
 	cfg.AutoLeave = false
-	cfg.ToSplit = false
+	cfg.Split = false
 	return checkAndReturn(cfg, prs)
 }
 
@@ -237,6 +237,7 @@ func (c Changer) EnterMerge(autoLeave bool, ccs ...pb.ConfChangeSingle) (
 	}
 
 	cfg.AutoLeave = autoLeave
+	cfg.Merge = true
 	return checkAndReturn(cfg, prs)
 }
 
@@ -260,6 +261,7 @@ func (c Changer) LeaveMerge() (tracker.Config, tracker.ProgressMap, error) {
 	*outgoingPtr(&cfg.Voters) = nil
 
 	cfg.AutoLeave = false
+	cfg.Merge = false
 	return checkAndReturn(cfg, prs)
 }
 

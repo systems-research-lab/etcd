@@ -1256,9 +1256,8 @@ func (s *EtcdServer) applyAll(ep *etcdProgress, apply *apply) {
 		if ent.Type == raftpb.EntryMergeConfChange {
 			var cc raftpb.ConfChangeV2
 			pbutil.MustUnmarshal(&cc, ent.Data)
-			if cc.Transition == raftpb.ConfChangeMergeEnter {
+			if cc.Transition == raftpb.ConfChangeTransitionMergeEnter {
 				s.reset(ep)
-				s.lg.Info("reset etcd progress and consist index")
 			}
 		}
 	}
@@ -1473,8 +1472,9 @@ func (s *EtcdServer) applyConfChangeEnts(apply *apply) {
 }
 
 func appliedConfEntryKey(entry raftpb.Entry) string {
-	// TODO: add epoch
-	return strconv.FormatUint(entry.Term, 10) + "-" + strconv.FormatUint(entry.Index, 10)
+	return strconv.FormatUint(entry.Epoch, 10) + "-" +
+		strconv.FormatUint(entry.Term, 10) + "-" +
+		strconv.FormatUint(entry.Index, 10)
 }
 
 func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
@@ -1485,8 +1485,9 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 
 	if cc.Transition != raftpb.ConfChangeTransitionSplitImplicit &&
 		cc.Transition != raftpb.ConfChangeTransitionSplitExplicit &&
-		cc.Transition != raftpb.ConfChangeTransitionSplitLeave {
-		s.lg.Info("unsupported conf change entry: " + entry.String())
+		cc.Transition != raftpb.ConfChangeTransitionSplitLeave &&
+		cc.Transition != raftpb.ConfChangeTransitionMergeLeave {
+		s.lg.Panic("unsupported conf change entry: " + entry.String())
 		return
 	}
 
@@ -2353,6 +2354,9 @@ func (s *EtcdServer) apply(
 		case raftpb.EntryMergeConfChange:
 			var cc raftpb.ConfChangeV2
 			pbutil.MustUnmarshal(&cc, e.Data)
+			if cc.Transition != raftpb.ConfChangeTransitionMergeEnter {
+				panic("not enter merge joint transition")
+			}
 			cc.ConfTerm = e.Term
 			cc.ConfIndex = e.Index
 			s.m.enterJoint(cc)

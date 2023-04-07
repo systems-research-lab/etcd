@@ -365,7 +365,7 @@ func (n *node) run() {
 				r.Step(m)
 			}
 		case cc := <-n.confc:
-			if cc.Transition == pb.ConfChangeMerge {
+			if cc.Transition == pb.ConfChangeTransitionMerge {
 				// get next epoch
 				ents, err := r.raftLog.entries(r.raftLog.lastIndex(), noLimit)
 				if err != nil {
@@ -384,10 +384,7 @@ func (n *node) run() {
 				storage.hardState = pb.HardState{Epoch: nextEpoch}
 				storage.snapshot = pb.Snapshot{
 					Metadata: pb.SnapshotMetadata{
-						ConfState: pb.ConfState{
-							Voters: r.prs.ConfState().Voters,
-							Quorum: r.prs.ConfState().Quorum,
-						},
+						ConfState: r.prs.ConfState(),
 					},
 				}
 				storage.ents = make([]pb.Entry, 1)
@@ -418,7 +415,7 @@ func (n *node) run() {
 				r.logger.Infof("epoch changed to %v", r.Epoch)
 
 				cc = pb.ConfChangeV2{
-					Transition: pb.ConfChangeMergeEnter,
+					Transition: pb.ConfChangeTransitionMergeEnter,
 					Changes:    cc.Changes,
 					Context:    cc.Context, // context is pb.MergeInfo
 					ConfIndex:  1,
@@ -452,6 +449,7 @@ func (n *node) run() {
 				}
 				r.raftLog.commitTo(r.raftLog.lastIndex())
 				r.raftLog.stableTo(r.raftLog.lastIndex(), r.raftLog.lastTerm())
+				r.pendingConfIndex = r.raftLog.lastIndex()
 
 				select {
 				case n.confstatec <- pb.ConfState{}:
