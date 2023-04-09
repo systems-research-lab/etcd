@@ -296,18 +296,22 @@ func memberSplitCommandFunc(cmd *cobra.Command, args []string) {
 		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("member IDs are not provided"))
 	}
 
-	idStrs := strings.Split(args[0], ",")
-	ids := make([]uint64, 0, len(idStrs))
-	for _, idStr := range idStrs {
-		id, err := strconv.ParseUint(idStr, 16, 64)
-		if err != nil {
-			cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("bad member ID arg (%v), expecting ID in Hex", err))
+	clrs := make([]etcdserverpb.MemberList, 0)
+	for _, clrStr := range args {
+		idStrs := strings.Split(clrStr, ",")
+		mems := make([]etcdserverpb.Member, 0)
+		for _, idStr := range idStrs {
+			id, err := strconv.ParseUint(idStr, 16, 64)
+			if err != nil {
+				cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("bad member ID arg (%v), expecting ID in Hex", err))
+			}
+			mems = append(mems, etcdserverpb.Member{ID: id})
 		}
-		ids = append(ids, id)
+		clrs = append(clrs, etcdserverpb.MemberList{Members: mems})
 	}
 
 	ctx, cancel := commandCtx(cmd)
-	_, err := mustClientFromCmd(cmd).MemberSplit(ctx, ids, explictLeave, leave)
+	_, err := mustClientFromCmd(cmd).MemberSplit(ctx, clrs, explictLeave, leave)
 	cancel()
 	if err != nil {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)
@@ -322,7 +326,7 @@ func memberMergeCommandFunc(cmd *cobra.Command, args []string) {
 	ctx, cancel := commandCtx(cmd)
 
 	urlStrs := strings.Split(args[0], ",")
-	clusters := map[uint64]*etcdserverpb.MemberList{}
+	clusters := map[uint64]etcdserverpb.MemberList{}
 	for _, url := range urlStrs {
 		client, err := clientv3.New(clientv3.Config{Endpoints: []string{url}})
 		if err != nil {
@@ -339,8 +343,11 @@ func memberMergeCommandFunc(cmd *cobra.Command, args []string) {
 			cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("no member exists by url (%v)", url))
 		}
 
-		clusters[resp.Header.ClusterId] = &etcdserverpb.MemberList{
-			Members: append([]*etcdserverpb.Member{}, resp.Members...)}
+		mems := make([]etcdserverpb.Member, 0)
+		for _, mem := range resp.Members {
+			mems = append(mems, *mem)
+		}
+		clusters[resp.Header.ClusterId] = etcdserverpb.MemberList{Members: mems}
 	}
 
 	_, err := mustClientFromCmd(cmd).MemberMerge(ctx, clusters)

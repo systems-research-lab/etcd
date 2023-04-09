@@ -606,6 +606,7 @@ func (r *raft) advance(rd Ready) {
 					panic("marshal split leave entry failed: " + err.Error())
 				}
 				ent.Data = data
+				r.logger.Debugf("propose merge leave")
 			}
 
 			// There's no way in which this proposal should be able to be rejected.
@@ -940,10 +941,11 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 						}
 
 						if cc.Transition == pb.ConfChangeTransitionSplitLeave {
+							entries = entries[:i+1]
 							r.send(pb.Message{Type: pb.MsgPullResp, To: m.From, Epoch: r.Epoch, Term: r.Term,
-								Entries: entries[:i+1]})
+								Entries: entries})
 							r.logger.Debugf("send %d entries indexed from %d to %d for pull",
-								len(entries), entries[i].Index, entries[len(entries)-1].Index)
+								len(entries), entries[0].Index, entries[len(entries)-1].Index)
 							return false, nil
 						}
 					}
@@ -971,7 +973,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 				r.logger.Panicf("entry %d conflict with committed entry at %d", ci, r.raftLog.committed)
 			default:
 				r.raftLog.append(m.Entries[ci-firstIdx:]...)
-				r.raftLog.commitTo(lastIdx)
+				//r.raftLog.commitTo(lastIdx)
 				r.logger.Debugf("commit pulled %d entries upto index %d", lastIdx-ci+1, r.raftLog.committed)
 			}
 			return false, nil

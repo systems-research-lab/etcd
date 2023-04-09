@@ -30,7 +30,7 @@ type (
 	MemberRemoveResponse  pb.MemberRemoveResponse
 	MemberUpdateResponse  pb.MemberUpdateResponse
 	MemberPromoteResponse pb.MemberPromoteResponse
-	MemberSplitResponse   pb.MemberPromoteResponse
+	MemberSplitResponse   pb.MemberSplitResponse
 	MemberMergeResponse   pb.MemberMergeResponse
 )
 
@@ -53,9 +53,9 @@ type Cluster interface {
 	// MemberPromote promotes a member from raft learner (non-voting) to raft voting member.
 	MemberPromote(ctx context.Context, id uint64) (*MemberPromoteResponse, error)
 
-	MemberSplit(ctx context.Context, ids []uint64, explictLeave, leave bool) (*MemberSplitResponse, error)
+	MemberSplit(ctx context.Context, clusters []pb.MemberList, explictLeave, leave bool) (*MemberSplitResponse, error)
 
-	MemberMerge(ctx context.Context, clusters map[uint64]*pb.MemberList) (*MemberMergeResponse, error)
+	MemberMerge(ctx context.Context, clusters map[uint64]pb.MemberList) (*MemberMergeResponse, error)
 }
 
 type cluster struct {
@@ -146,8 +146,8 @@ func (c *cluster) MemberPromote(ctx context.Context, id uint64) (*MemberPromoteR
 	return (*MemberPromoteResponse)(resp), nil
 }
 
-func (c *cluster) MemberSplit(ctx context.Context, ids []uint64, explictLeave, leave bool) (*MemberSplitResponse, error) {
-	r := &pb.MemberSplitRequest{IDs: ids, ExplicitLeave: explictLeave, Leave: leave}
+func (c *cluster) MemberSplit(ctx context.Context, clusters []pb.MemberList, explictLeave, leave bool) (*MemberSplitResponse, error) {
+	r := &pb.MemberSplitRequest{Clusters: clusters, ExplicitLeave: explictLeave, Leave: leave}
 	resp, err := c.remote.MemberSplit(ctx, r, c.callOpts...)
 	if err != nil {
 		return nil, toErr(ctx, err)
@@ -155,7 +155,7 @@ func (c *cluster) MemberSplit(ctx context.Context, ids []uint64, explictLeave, l
 	return (*MemberSplitResponse)(resp), nil
 }
 
-func (c *cluster) MemberMerge(ctx context.Context, clusters map[uint64]*pb.MemberList) (*MemberMergeResponse, error) {
+func (c *cluster) MemberMerge(ctx context.Context, clusters map[uint64]pb.MemberList) (*MemberMergeResponse, error) {
 	r := &pb.MemberMergeRequest{Clusters: clusters}
 	resp, err := c.remote.MemberMerge(ctx, r, c.callOpts...)
 	if err != nil {

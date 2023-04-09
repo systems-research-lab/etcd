@@ -111,8 +111,14 @@ func (c *Config) Clone() Config {
 		}
 		return mm
 	}
+
+	voters := quorum.JointConfig{}
+	for i := range c.Voters {
+		voters[i] = clone(c.Voters[i])
+	}
+
 	return Config{
-		Voters:       quorum.JointConfig{clone(c.Voters[0]), clone(c.Voters[1])},
+		Voters:       voters,
 		Learners:     clone(c.Learners),
 		LearnersNext: clone(c.LearnersNext),
 		Quorum:       c.Quorum,
@@ -152,9 +158,14 @@ func MakeProgressTracker(maxInflight int) ProgressTracker {
 
 // ConfState returns a ConfState representing the active configuration.
 func (p *ProgressTracker) ConfState() pb.ConfState {
+	outgoing := make([]uint64, 0)
+	for i := 1; i < len(p.Voters); i++ {
+		outgoing = append(outgoing, p.Voters[i].Slice()...)
+	}
+
 	return pb.ConfState{
 		Voters:         p.Voters[0].Slice(),
-		VotersOutgoing: p.Voters[1].Slice(),
+		VotersOutgoing: outgoing,
 		Learners:       quorum.MajorityConfig(p.Learners).Slice(),
 		LearnersNext:   quorum.MajorityConfig(p.LearnersNext).Slice(),
 		AutoLeave:      p.AutoLeave,

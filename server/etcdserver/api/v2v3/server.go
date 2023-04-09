@@ -95,11 +95,11 @@ func (s *v2v3Server) UpdateMember(ctx context.Context, m membership.Member) ([]*
 	return v3MembersToMembership(resp.Members), nil
 }
 
-func (s *v2v3Server) SplitMember(ctx context.Context, ids []uint64, explicitLeave, leave bool) ([]*membership.Member, error) {
+func (s *v2v3Server) SplitMember(ctx context.Context, clusters []pb.MemberList, explicitLeave, leave bool) ([]membership.Member, error) {
 	panic("unimplemented!")
 }
 
-func (s *v2v3Server) MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]*membership.Member, error) {
+func (s *v2v3Server) MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]membership.Member, error) {
 	panic("unimplemented!")
 }
 

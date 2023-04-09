@@ -20,6 +20,7 @@ import (
 	"go.etcd.io/etcd/server/v3/mvcc"
 	"go.uber.org/zap"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -57,19 +58,21 @@ type merger struct {
 	id        types.ID
 	rn        raft.Node
 	kv        mvcc.KV
+	ticker    *time.Ticker
 	dataDir   string
 	applierV3 applierV3
 	cluster   *membership.RaftCluster
 	transport rafthttp.Transporter
 	Lessor    lease.Lessor
 	msgChan   chan raftpb.Message
+	sendChan  chan struct{}
 	snapChan  chan struct{}
 
 	lg *zap.Logger
 }
 
 func (m *merger) getTxStore(ctx context.Context) txStore {
-	txn := m.kv.Read(mvcc.ConcurrentReadTxMode, traceutil.Get(ctx))
+	txn := m.kv.Write(traceutil.Get(context.Background()))
 	defer txn.End()
 
 	rr, err := txn.Range(ctx, []byte(StoreKey), nil, mvcc.RangeOptions{})
@@ -122,7 +125,7 @@ func (m *merger) proposeMerge(ctx context.Context, r pb.MemberMergeRequest) erro
 	for cid, members := range r.Clusters {
 		membersBuf := make([][]byte, 0, len(members.Members))
 		for _, mem := range members.Members {
-			membersBuf = append(membersBuf, pbutil.MustMarshal(mem))
+			membersBuf = append(membersBuf, pbutil.MustMarshal(&mem))
 		}
 
 		clusters = append(clusters, raftpb.Cluster{Id: cid, Members: membersBuf})
@@ -138,7 +141,7 @@ func (m *merger) proposeMerge(ctx context.Context, r pb.MemberMergeRequest) erro
 }
 
 func validateInfo(info raftpb.MergeInfo, store txStore) error {
-	if info.Type == raftpb.Prepare {
+	if info.Type == raftpb.Prepare || info.Type == raftpb.Prepared {
 		return nil
 	}
 
@@ -163,9 +166,13 @@ func validateInfo(info raftpb.MergeInfo, store txStore) error {
 }
 
 func duplicateInfo(info raftpb.MergeInfo, store txStore) bool {
-	state, ok := store.States[uuid.MustParse(info.Txid)]
+	txid := uuid.MustParse(info.Txid)
+	state, ok := store.States[txid]
 	switch info.Type {
 	case raftpb.Prepare:
+		return ok
+	case raftpb.Prepared:
+		_, ok = state.Progress[types.ID(info.Clusters[0].Id)]
 		return ok
 	case raftpb.Commit:
 		return state.Phase == committed || state.Phase == ackedCommit
@@ -194,6 +201,8 @@ func (m *merger) apply(entry raftpb.Entry) {
 			zap.String("type", info.Type.String()))
 		return
 	}
+
+	sendNow := false
 
 	txid := uuid.MustParse(info.Txid)
 	switch info.Type {
@@ -235,7 +244,7 @@ func (m *merger) apply(entry raftpb.Entry) {
 			zap.String("txid", txid.String()),
 			zap.Any("clusters", txs.Clusters))
 
-	case raftpb.Commit:
+	case raftpb.Prepared: // only on coordinator
 		txs := store.States[txid]
 		cid := types.ID(info.Clusters[0].Id)
 		txs.Progress[cid] = struct{}{}
@@ -254,13 +263,32 @@ func (m *merger) apply(entry raftpb.Entry) {
 				store.Ongoing = uuid.Nil
 			}
 
-			m.lg.Debug("committed merge tx",
+			sendNow = true
+
+			m.lg.Debug("coordinator committed merge tx",
 				zap.String("txid", txid.String()),
 				zap.Any("phase", txs.Phase),
 				zap.Any("clusters", txs.Clusters))
 		}
+		store.States[txid] = txs
+
+	case raftpb.Commit: // only on participants
+		txs := store.States[txid]
+
+		txs.Phase = committed
+		txs.Progress = make(map[types.ID]struct{}, len(txs.Clusters))
+		txs.Progress[m.cluster.ID()] = struct{}{}
+		txs.Info.Type = raftpb.Commit
+
+		m.applyMergeConfChange(txs.Clusters, info)
+
+		m.lg.Debug("participant committed merge tx",
+			zap.String("txid", txid.String()),
+			zap.Any("phase", txs.Phase),
+			zap.Any("clusters", txs.Clusters))
 
 		store.States[txid] = txs
+		store.Ongoing = uuid.Nil
 
 	case raftpb.Abort:
 		txs := store.States[txid]
@@ -270,6 +298,8 @@ func (m *merger) apply(entry raftpb.Entry) {
 		txs.Progress[m.cluster.ID()] = struct{}{}
 		txs.Info = info
 		store.States[txid] = txs
+
+		sendNow = true
 
 		m.lg.Debug("abort merge tx",
 			zap.String("txid", txid.String()),
@@ -300,21 +330,26 @@ func (m *merger) apply(entry raftpb.Entry) {
 
 			txs.Info.Type = raftpb.Ack
 			store.Ongoing = uuid.Nil
+			store.States[txid] = txs
 
 			m.lg.Debug("acked merge tx",
 				zap.String("txid", txid.String()),
 				zap.Any("phase", txs.Phase),
 				zap.Any("clusters", txs.Clusters))
 		}
-
-		store.States[txid] = txs
 	}
 
 	m.putTxStore(store)
+	if sendNow {
+		go func() { m.sendChan <- struct{}{} }()
+	}
 }
 
 func (m *merger) applyMergeConfChange(clusters map[types.ID][]pb.Member, info raftpb.MergeInfo) {
 	m.lg.Debug("ready to apply merge", zap.String("txid", info.Txid))
+
+	// resume after requested all snapshots
+	m.ticker.Stop()
 
 	// add to cluster membership
 	changes := make([]raftpb.ConfChangeSingle, 0)
@@ -336,8 +371,9 @@ func (m *merger) applyMergeConfChange(clusters map[types.ID][]pb.Member, info ra
 			}, membership.ApplyBoth)
 
 			changes = append(changes, raftpb.ConfChangeSingle{
-				Type:   raftpb.ConfChangeMergeNode,
-				NodeID: mem.ID,
+				Type:    raftpb.ConfChangeMergeNode,
+				NodeID:  mem.ID,
+				Context: []byte(strconv.FormatUint(uint64(cid), 10)),
 			})
 		}
 	}
@@ -384,15 +420,16 @@ func (m *merger) mustWriteSnapFile(clusterId types.ID, data []byte) {
 
 func (m merger) snapshotter() {
 	txn := m.kv.Read(mvcc.ConcurrentReadTxMode, traceutil.Get(context.Background()))
-	rr, err := txn.Range(context.Background(), []byte{0}, []byte{}, mvcc.RangeOptions{})
+	rr1, err := txn.Range(context.Background(), []byte{0}, []byte(StoreKey), mvcc.RangeOptions{})
+	rr2, err := txn.Range(context.Background(), []byte(StoreKey+"\x00"), []byte{}, mvcc.RangeOptions{})
 	if err != nil {
 		txn.End()
-		panic(fmt.Errorf("cannot read tx store: %v", err))
+		panic(fmt.Errorf("cannot read kv for snapshot: %v", err))
 	}
 	txn.End()
 
 	buf := bytes.Buffer{}
-	if err = gob.NewEncoder(&buf).Encode(MergeSnapshot(rr.KVs)); err != nil {
+	if err = gob.NewEncoder(&buf).Encode(MergeSnapshot(append(rr1.KVs, rr2.KVs...))); err != nil {
 		panic(fmt.Errorf("encode snapshot kv failed: %v", err))
 	}
 	m.mustWriteSnapFile(m.cluster.ID(), buf.Bytes())
@@ -422,8 +459,8 @@ func (m merger) snapshotRequester(clusters map[types.ID][]pb.Member) {
 
 				m.transport.Send(reqs)
 			}
-			time.Sleep(10 * time.Millisecond)
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -453,6 +490,11 @@ func (m *merger) run() {
 func (m *merger) sender() {
 	// ticking and sending messages out for ongoing tx
 	for {
+		select {
+		case <-m.sendChan:
+		case <-time.After(1 * time.Second):
+		}
+
 		if m.rn.Status().SoftState.Lead != uint64(m.id) {
 			continue
 		}
@@ -493,9 +535,6 @@ func (m *merger) sender() {
 
 			m.transport.Send(msgs)
 		}
-
-		// TODO: tweaking
-		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -507,6 +546,9 @@ type snapshotResp struct {
 func (m *merger) handler() {
 	for {
 		msg := <-m.msgChan
+		m.lg.Debug("receive tx message",
+			zap.Stringer("type", msg.Type),
+			zap.Uint64("from", msg.From))
 
 		if msg.Type == raftpb.MsgMergeSnapReq {
 			m.lg.Debug("receive merge snap request", zap.Uint64("from", msg.From))
@@ -569,10 +611,7 @@ func (m *merger) handler() {
 			}
 			state = s
 		}
-		m.lg.Debug("receive tx message",
-			zap.Stringer("type", msg.Type),
-			zap.Uint64("from", msg.From),
-			zap.Stringer("txid", txid))
+		m.lg.Debug("tx message", zap.Stringer("txid", txid))
 
 		resps := make([]raftpb.Message, 0)
 		switch msg.Type {
@@ -679,11 +718,20 @@ func (m *merger) handler() {
 				break
 			}
 
+			if _, ok := state.Progress[cid]; ok {
+				m.lg.Debug("duplicate tx message",
+					zap.Stringer("type", msg.Type),
+					zap.Uint64("from", msg.From),
+					zap.Stringer("txid", txid))
+				zap.Stringer("cluster", cid)
+				break
+			}
+
 			m.lg.Debug("ready to propose cluster prepare",
 				zap.Stringer("txid", txid),
 				zap.Any("phase", state.Phase),
 				zap.Any("cluster", cid))
-			state.Info.Type = raftpb.Commit
+			state.Info.Type = raftpb.Prepared
 			state.Info.Clusters = append(make([]raftpb.Cluster, 0), raftpb.Cluster{Id: uint64(cid)})
 			if err := m.rn.ProposeMerge(context.Background(), state.Info); err != nil {
 				m.lg.Debug("propose to cluster prepare failed", zap.Error(err))

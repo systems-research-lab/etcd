@@ -373,8 +373,6 @@ func (n *node) run() {
 				}
 				nextEpoch := ents[0].Epoch + 1
 
-				// entries for new epoch
-
 				// reset storage
 				storage, ok := r.raftLog.storage.(*MemoryStorage)
 				if !ok {
@@ -390,6 +388,7 @@ func (n *node) run() {
 				storage.ents = make([]pb.Entry, 1)
 				storage.prevconfstate = pb.ConfMetadata{}
 				storage.currconfstate = pb.ConfMetadata{}
+				r.logger.Debugf("reset storage for merge")
 				storage.Unlock()
 
 				// reset raft
@@ -450,6 +449,8 @@ func (n *node) run() {
 				r.raftLog.commitTo(r.raftLog.lastIndex())
 				r.raftLog.stableTo(r.raftLog.lastIndex(), r.raftLog.lastTerm())
 				r.pendingConfIndex = r.raftLog.lastIndex()
+				rd = Ready{}
+				r.logger.Debugf("append enter joint and snapshot entry for merge")
 
 				select {
 				case n.confstatec <- pb.ConfState{}:

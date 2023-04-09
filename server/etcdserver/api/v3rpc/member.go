@@ -106,11 +106,11 @@ func (cs *ClusterServer) MemberPromote(ctx context.Context, r *pb.MemberPromoteR
 }
 
 func (cs *ClusterServer) MemberSplit(ctx context.Context, r *pb.MemberSplitRequest) (*pb.MemberSplitResponse, error) {
-	membs, err := cs.server.SplitMember(ctx, r.IDs, r.ExplicitLeave, r.Leave)
+	membs, err := cs.server.SplitMember(ctx, r.Clusters, r.ExplicitLeave, r.Leave)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.MemberSplitResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
+	return &pb.MemberSplitResponse{Header: cs.header(), Members: membersToProtoNonPointerMembers(membs)}, nil
 }
 
 func (cs *ClusterServer) MemberMerge(ctx context.Context, r *pb.MemberMergeRequest) (*pb.MemberMergeResponse, error) {
@@ -118,7 +118,7 @@ func (cs *ClusterServer) MemberMerge(ctx context.Context, r *pb.MemberMergeReque
 	if err != nil {
 		return nil, err
 	}
-	return &pb.MemberMergeResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
+	return &pb.MemberMergeResponse{Header: cs.header(), Members: membersToProtoNonPointerMembers(membs)}, nil
 }
 
 func (cs *ClusterServer) header() *pb.ResponseHeader {
@@ -129,6 +129,20 @@ func membersToProtoMembers(membs []*membership.Member) []*pb.Member {
 	protoMembs := make([]*pb.Member, len(membs))
 	for i := range membs {
 		protoMembs[i] = &pb.Member{
+			Name:       membs[i].Name,
+			ID:         uint64(membs[i].ID),
+			PeerURLs:   membs[i].PeerURLs,
+			ClientURLs: membs[i].ClientURLs,
+			IsLearner:  membs[i].IsLearner,
+		}
+	}
+	return protoMembs
+}
+
+func membersToProtoNonPointerMembers(membs []membership.Member) []pb.Member {
+	protoMembs := make([]pb.Member, len(membs))
+	for i := range membs {
+		protoMembs[i] = pb.Member{
 			Name:       membs[i].Name,
 			ID:         uint64(membs[i].ID),
 			PeerURLs:   membs[i].PeerURLs,

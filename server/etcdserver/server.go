@@ -71,7 +71,7 @@ import (
 )
 
 const (
-	DefaultSnapshotCount = 100000
+	DefaultSnapshotCount = 100000000
 
 	// DefaultSnapshotCatchUpEntries is the number of entries for a slow follower
 	// to catch-up after compacting the raft storage entries.
@@ -172,9 +172,9 @@ type Server interface {
 	// return ErrMemberNotLearner if the member is not a learner.
 	PromoteMember(ctx context.Context, id uint64) ([]*membership.Member, error)
 
-	SplitMember(ctx context.Context, ids []uint64, explicitLeave, leave bool) ([]*membership.Member, error)
+	SplitMember(ctx context.Context, clusters []pb.MemberList, explicitLeave, leave bool) ([]membership.Member, error)
 
-	MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]*membership.Member, error)
+	MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]membership.Member, error)
 
 	// ClusterVersion is the cluster-wide minimum major.minor version.
 	// Cluster version is set to the min version that an etcd member is
@@ -710,6 +710,7 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		id:        srv.id,
 		rn:        srv.r.Node,
 		kv:        srv.kv,
+		ticker:    srv.r.ticker,
 		dataDir:   srv.Cfg.DataDir,
 		applierV3: srv.applyV3,
 		transport: srv.r.transport,
@@ -1811,15 +1812,9 @@ func (s *EtcdServer) PromoteMember(ctx context.Context, id uint64) ([]*membershi
 	return nil, ErrCanceled
 }
 
-func (s *EtcdServer) SplitMember(ctx context.Context, ids []uint64, explictLeave, leave bool) ([]*membership.Member, error) {
+func (s *EtcdServer) SplitMember(ctx context.Context, clusters []pb.MemberList, explictLeave, leave bool) ([]membership.Member, error) {
 	if err := s.checkMembershipOperationPermission(ctx); err != nil {
 		return nil, err
-	}
-
-	for _, id := range ids {
-		if s.cluster.Member(types.ID(id)) == nil {
-			return nil, fmt.Errorf("unexisted member id: %v", id)
-		}
 	}
 
 	if leave { // leave joint consensus for split
@@ -1827,14 +1822,20 @@ func (s *EtcdServer) SplitMember(ctx context.Context, ids []uint64, explictLeave
 			return nil, err
 		}
 	} else { // enter joint consensus for split
-		changes := make([]raftpb.ConfChangeSingle, 0, len(ids))
-		for _, id := range ids {
-			changes = append(changes,
-				raftpb.ConfChangeSingle{
-					Type:    raftpb.ConfChangeSplitNode,
-					NodeID:  id,
-					Context: nil,
-				})
+		changes := make([]raftpb.ConfChangeSingle, 0)
+		for idx, clr := range clusters {
+			for _, mem := range clr.Members {
+				if s.cluster.Member(types.ID(mem.ID)) == nil {
+					return nil, fmt.Errorf("unexisted member: %v", mem.ID)
+				}
+
+				changes = append(changes,
+					raftpb.ConfChangeSingle{
+						Type:    raftpb.ConfChangeSplitNode,
+						NodeID:  mem.ID,
+						Context: []byte(strconv.Itoa(idx)),
+					})
+			}
 		}
 
 		transition := raftpb.ConfChangeTransitionSplitImplicit
@@ -1850,7 +1851,7 @@ func (s *EtcdServer) SplitMember(ctx context.Context, ids []uint64, explictLeave
 	return nil, nil
 }
 
-func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]*membership.Member, error) {
+func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]membership.Member, error) {
 	return nil, s.m.proposeMerge(ctx, r)
 }
 
@@ -2405,6 +2406,9 @@ func (s *EtcdServer) apply(
 			}
 			txn.End()
 			s.lg.Debug("installed all snapshots")
+
+			// restore ticker stopped before apply merge conf change
+			s.r.ticker.Reset(s.r.heartbeat)
 
 		default:
 			lg := s.Logger()

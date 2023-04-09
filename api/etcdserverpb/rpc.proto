@@ -950,9 +950,13 @@ message MemberPromoteResponse {
   repeated Member members = 2;
 }
 
+message MemberList {
+  repeated Member Members = 1 [(gogoproto.nullable) = false];
+}
+
 message MemberSplitRequest {
   // IDs of nodes to split from the cluster
-  repeated uint64 IDs = 1;
+  repeated MemberList clusters = 1 [(gogoproto.nullable) = false];
   // ExplicitLeave tells whether nodes should leave the joint consensus automatically when safe
   bool ExplicitLeave = 2;
   // Leave explicitly tells the cluster in joint consensus to leave
@@ -961,21 +965,17 @@ message MemberSplitRequest {
 
 message MemberSplitResponse {
   ResponseHeader header = 1;
-  repeated Member members = 2;
-}
-
-message MemberList {
-  repeated Member Members = 1;
+  repeated Member members = 2 [(gogoproto.nullable) = false];
 }
 
 message MemberMergeRequest {
   // clusters mapping from cluster id to a member
-  map<uint64, MemberList> clusters = 1;
+  map<uint64, MemberList> clusters = 1 [(gogoproto.nullable) = false];
 }
 
 message MemberMergeResponse {
   ResponseHeader header = 1;
-  repeated Member members = 2;
+  repeated Member members = 2 [(gogoproto.nullable) = false];
 }
 
 message DefragmentRequest {

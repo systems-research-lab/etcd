@@ -17,6 +17,7 @@ package confchange
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"go.etcd.io/etcd/raft/v3/quorum"
@@ -128,10 +129,6 @@ func (c Changer) LeaveJoint() (tracker.Config, tracker.ProgressMap, error) {
 // EnterSplit enters a joint consensus for split. In the joint consensus,
 // the config containing current node is marked incoming one and the other
 // one will be outgoing.
-// As an example, transit from (1,2,3) into (1,2)&(3):
-// 1. either (1,2) or (3) will exist in ccs and should be marked as pb.ConfChangeUpdateNode,
-// 2. for 1 and 2, incoming is (1,2) and outgoing is (3),
-// 3. for 3, incoming is (3) and outgoing is (1,2).
 func (c Changer) EnterSplit(autoLeave bool, currId uint64, ccs ...pb.ConfChangeSingle) (
 	tracker.Config, tracker.ProgressMap, error) {
 	cfg, prs, err := c.checkAndCopy()
@@ -149,27 +146,45 @@ func (c Changer) EnterSplit(autoLeave bool, currId uint64, ccs ...pb.ConfChangeS
 		return c.err(err)
 	}
 
-	// remove nodes from cfg.Voters[0] and add to cfg.Voters[1]
-	swap := false
-	*outgoingPtr(&cfg.Voters) = quorum.MajorityConfig{}
+	incomingIdx := -1
+	clrs := make(map[int][]uint64)
 	for _, cc := range ccs {
 		if _, ok := prs[cc.NodeID]; !ok {
 			return c.err(fmt.Errorf("unknown node id to split: %v", cc.NodeID))
 		}
 
-		if currId == cc.NodeID {
-			swap = true
+		idx, err := strconv.Atoi(string(cc.Context))
+		if err != nil {
+			return c.err(fmt.Errorf("convert cluster idx failed: %v", err))
 		}
 
-		delete(incoming(cfg.Voters), cc.NodeID)
-		outgoing(cfg.Voters)[cc.NodeID] = struct{}{}
+		if _, ok := clrs[idx]; !ok {
+			clrs[idx] = make([]uint64, 0)
+		}
+		clrs[idx] = append(clrs[idx], cc.NodeID)
+
+		if cc.NodeID == currId {
+			incomingIdx = idx
+		}
 	}
-	if swap {
-		*incomingPtr(&cfg.Voters), *outgoingPtr(&cfg.Voters) = outgoing(cfg.Voters), incoming(cfg.Voters)
+	if incomingIdx == -1 {
+		return c.err(fmt.Errorf("current node not found"))
+	}
+	if len(clrs) > len(cfg.Voters) {
+		return c.err(fmt.Errorf("too many clusters (%v), max is %v", len(clrs), len(cfg.Voters)))
 	}
 
-	if err := c.apply(&cfg, prs, ccs...); err != nil {
-		return c.err(err)
+	configIdx := 1
+	for clusterIdx, nodes := range clrs {
+		if clusterIdx == incomingIdx {
+			continue
+		}
+		cfg.Voters[configIdx] = quorum.MajorityConfig{}
+		for _, nodeId := range nodes {
+			delete(incoming(cfg.Voters), nodeId)
+			cfg.Voters[configIdx][nodeId] = struct{}{}
+		}
+		configIdx++
 	}
 
 	cfg.AutoLeave = autoLeave
@@ -192,16 +207,20 @@ func (c Changer) LeaveSplit() (tracker.Config, tracker.ProgressMap, error) {
 		return c.err(err)
 	}
 
-	for id := range outgoing(cfg.Voters) {
-		delete(prs, id)
+	for i := 1; i < len(cfg.Voters); i++ {
+		for id := range cfg.Voters[i] {
+			delete(prs, id)
+		}
+		cfg.Voters[i] = nil
 	}
-	*outgoingPtr(&cfg.Voters) = nil
 
 	cfg.AutoLeave = false
 	cfg.Split = false
 	return checkAndReturn(cfg, prs)
 }
 
+// EnterMerge enters merge joint consensus,
+// ccs will not contain nodes from current cluster.
 func (c Changer) EnterMerge(autoLeave bool, ccs ...pb.ConfChangeSingle) (
 	tracker.Config, tracker.ProgressMap, error) {
 	cfg, prs, err := c.checkAndCopy()
@@ -219,21 +238,33 @@ func (c Changer) EnterMerge(autoLeave bool, ccs ...pb.ConfChangeSingle) (
 		return c.err(err)
 	}
 
-	// add nodes to cfg.Voters[1]
-	*outgoingPtr(&cfg.Voters) = quorum.MajorityConfig{}
+	clrs := make(map[uint64][]uint64)
 	for _, cc := range ccs {
-		outgoing(cfg.Voters)[cc.NodeID] = struct{}{}
-		prs[cc.NodeID] = &tracker.Progress{
-			Next:         c.LastIndex,
-			Match:        0,
-			Inflights:    tracker.NewInflights(c.Tracker.MaxInflight),
-			IsLearner:    false,
-			RecentActive: true,
+		idx, err := strconv.ParseUint(string(cc.Context), 10, 64)
+		if err != nil {
+			return c.err(fmt.Errorf("convert cluster id failed: %v", err))
 		}
+
+		if _, ok := clrs[idx]; !ok {
+			clrs[idx] = make([]uint64, 0)
+		}
+		clrs[idx] = append(clrs[idx], cc.NodeID)
 	}
 
-	if err := c.apply(&cfg, prs, ccs...); err != nil {
-		return c.err(err)
+	configIdx := 1
+	for _, nodes := range clrs {
+		cfg.Voters[configIdx] = quorum.MajorityConfig{}
+		for _, nodeId := range nodes {
+			cfg.Voters[configIdx][nodeId] = struct{}{}
+			prs[nodeId] = &tracker.Progress{
+				Next:         c.LastIndex,
+				Match:        0,
+				Inflights:    tracker.NewInflights(c.Tracker.MaxInflight),
+				IsLearner:    false,
+				RecentActive: true,
+			}
+		}
+		configIdx++
 	}
 
 	cfg.AutoLeave = autoLeave
@@ -255,10 +286,12 @@ func (c Changer) LeaveMerge() (tracker.Config, tracker.ProgressMap, error) {
 		return c.err(err)
 	}
 
-	for id := range outgoing(cfg.Voters) {
-		incoming(cfg.Voters)[id] = struct{}{}
+	for i := 1; i < len(cfg.Voters); i++ {
+		for id := range cfg.Voters[i] {
+			incoming(cfg.Voters)[id] = struct{}{}
+		}
+		cfg.Voters[i] = nil
 	}
-	*outgoingPtr(&cfg.Voters) = nil
 
 	cfg.AutoLeave = false
 	cfg.Merge = false
