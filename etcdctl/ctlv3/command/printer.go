@@ -163,7 +163,7 @@ func (p *printerUnsupported) EndpointHashKV([]epHashKV) { p.p(nil) }
 func (p *printerUnsupported) MoveLeader(leader, target uint64, r v3.MoveLeaderResponse) { p.p(nil) }
 
 func makeMemberListTable(r v3.MemberListResponse) (hdr []string, rows [][]string) {
-	hdr = []string{"ID", "Progress", "Name", "Peer Addrs", "Client Addrs", "Is Learner"}
+	hdr = []string{"ID(Hex)", "ID(Dec)", "Progress", "Name", "Peer Addrs", "Client Addrs", "Is Learner"}
 	sort.Slice(r.Members, func(i, j int) bool { return r.Members[i].Name < r.Members[j].Name })
 	for _, m := range r.Members {
 		status := "started"

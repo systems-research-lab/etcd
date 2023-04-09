@@ -4,6 +4,7 @@ from fabric import task, Connection
 from invoke import UnexpectedExit
 
 PASSWORD = os.environ['KHOURY_PASSWORD']
+SSH_KEY_PATH = '~/.ssh/id_rsa'
 ETCD_DIR = '~/etcd'
 SERVER_DIR = ETCD_DIR + '/server'
 
@@ -107,6 +108,14 @@ def clean(ctx, cluster_url):
         run_cmd(cfg.ip, 'cd {} && '.format(SERVER_DIR) +
                 'rm -rf data.etcd.* && rm etcd.*.out')
         print("cleaned " + ip)
+
+
+@task
+def logs(ctx, ip):
+    """
+    cluster_url format: 1=http://127.0.0.1:1380,2=http://127.0.0.1:2380,3=http://127.0.0.1:3380,4=http://127.0.0.1:4380,5=http://127.0.0.1:5380,6=http://127.0.0.1:6380
+    """
+    os.system('scp -i {} {}:{}/etcd.*.out .'.format(SSH_KEY_PATH, ip, SERVER_DIR))
 
 
 def run_cmd(ip, cmd):
