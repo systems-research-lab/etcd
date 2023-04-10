@@ -32,6 +32,7 @@ type (
 	MemberPromoteResponse pb.MemberPromoteResponse
 	MemberSplitResponse   pb.MemberSplitResponse
 	MemberMergeResponse   pb.MemberMergeResponse
+	MemberJointResponse   pb.MemberJointResponse
 )
 
 type Cluster interface {
@@ -56,6 +57,8 @@ type Cluster interface {
 	MemberSplit(ctx context.Context, clusters []pb.MemberList, explictLeave, leave bool) (*MemberSplitResponse, error)
 
 	MemberMerge(ctx context.Context, clusters map[uint64]pb.MemberList) (*MemberMergeResponse, error)
+
+	MemberJoint(ctx context.Context, addPeersAddr []string, removePeersId []uint64) (*MemberJointResponse, error)
 }
 
 type cluster struct {
@@ -162,4 +165,13 @@ func (c *cluster) MemberMerge(ctx context.Context, clusters map[uint64]pb.Member
 		return nil, toErr(ctx, err)
 	}
 	return (*MemberMergeResponse)(resp), nil
+}
+
+func (c *cluster) MemberJoint(ctx context.Context, addPeersAddr []string, removePeersId []uint64) (*MemberJointResponse, error) {
+	r := &pb.MemberJointRequest{AddPeersUrl: addPeersAddr, RemovePeersId: removePeersId}
+	resp, err := c.remote.MemberJoint(ctx, r, c.callOpts...)
+	if err != nil {
+		return nil, toErr(ctx, err)
+	}
+	return (*MemberJointResponse)(resp), nil
 }

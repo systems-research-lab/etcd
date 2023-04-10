@@ -165,7 +165,7 @@ func (r *raftNode) tick() {
 
 // start prepares and starts raftNode in a new goroutine. It is no longer safe
 // to modify the fields after it has been started.
-func (r *raftNode) start(rh *raftReadyHandler) {
+func (r *raftNode) start(localId uint64, rh *raftReadyHandler) {
 	internalTimeout := time.Second
 
 	var confMetaData raftpb.ConfMetadata

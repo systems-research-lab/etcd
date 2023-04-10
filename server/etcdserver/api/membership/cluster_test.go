@@ -441,7 +441,7 @@ func TestClusterGenID(t *testing.T) {
 		newTestMember(2, nil, "", nil),
 	})
 
-	cs.genID()
+	cs.GenId()
 	if cs.ID() == 0 {
 		t.Fatalf("cluster.ID = %v, want not 0", cs.ID())
 	}
@@ -449,7 +449,7 @@ func TestClusterGenID(t *testing.T) {
 
 	cs.SetStore(mockstore.NewNop())
 	cs.AddMember(newTestMember(3, nil, "", nil), true)
-	cs.genID()
+	cs.GenId()
 	if cs.ID() == previd {
 		t.Fatalf("cluster.ID = %v, want not %v", cs.ID(), previd)
 	}

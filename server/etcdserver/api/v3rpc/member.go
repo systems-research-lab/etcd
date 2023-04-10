@@ -121,6 +121,25 @@ func (cs *ClusterServer) MemberMerge(ctx context.Context, r *pb.MemberMergeReque
 	return &pb.MemberMergeResponse{Header: cs.header(), Members: membersToProtoNonPointerMembers(membs)}, nil
 }
 
+func (cs *ClusterServer) MemberJoint(ctx context.Context, r *pb.MemberJointRequest) (*pb.MemberJointResponse, error) {
+	addMembs := make([]membership.Member, 0)
+	for _, url := range r.AddPeersUrl {
+		urls, err := types.NewURLs([]string{url})
+		if err != nil {
+			return nil, rpctypes.ErrGRPCMemberBadURLs
+		}
+
+		now := time.Now()
+		addMembs = append(addMembs, *membership.NewMember("", urls, "", &now))
+	}
+
+	membs, err := cs.server.JointMember(ctx, addMembs, r.RemovePeersId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.MemberJointResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
+}
+
 func (cs *ClusterServer) header() *pb.ResponseHeader {
 	return &pb.ResponseHeader{ClusterId: uint64(cs.cluster.ID()), MemberId: uint64(cs.server.ID()), RaftTerm: cs.server.Term()}
 }

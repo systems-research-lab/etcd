@@ -191,6 +191,10 @@ func (rcc *retryClusterClient) MemberMerge(ctx context.Context, in *pb.MemberMer
 	return rcc.cc.MemberMerge(ctx, in, opts...)
 }
 
+func (rcc *retryClusterClient) MemberJoint(ctx context.Context, in *pb.MemberJointRequest, opts ...grpc.CallOption) (resp *pb.MemberJointResponse, err error) {
+	return rcc.cc.MemberJoint(ctx, in, opts...)
+}
+
 type retryMaintenanceClient struct {
 	mc pb.MaintenanceClient
 }

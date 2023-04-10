@@ -95,7 +95,7 @@ func NewClusterFromURLsMap(lg *zap.Logger, token string, urlsmap types.URLsMap) 
 		}
 		c.members[m.ID] = m
 	}
-	c.genID()
+	c.GenId()
 	return c, nil
 }
 
@@ -230,7 +230,7 @@ func (c *RaftCluster) String() string {
 	return b.String()
 }
 
-func (c *RaftCluster) genID() {
+func (c *RaftCluster) GenId() {
 	mIDs := c.MemberIDs()
 	b := make([]byte, 8*len(mIDs))
 	for i, id := range mIDs {

@@ -21,6 +21,7 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -323,7 +324,7 @@ func newRaft(c *Config) *raft {
 	if err := c.validate(); err != nil {
 		panic(err.Error())
 	}
-	raftlog := newLogWithSize(c.Storage, c.Logger, c.MaxCommittedSizePerReady)
+	raftlog := newLogWithSize(c.ID, c.Storage, c.Logger, c.MaxCommittedSizePerReady)
 	hs, cs, err := c.Storage.InitialState()
 	if err != nil {
 		panic(err) // TODO(bdarnell)
@@ -332,6 +333,7 @@ func newRaft(c *Config) *raft {
 	r := &raft{
 		id:                        c.ID,
 		lead:                      None,
+		Epoch:                     1,
 		isLearner:                 false,
 		raftLog:                   raftlog,
 		maxMsgSize:                c.MaxSizePerMsg,
@@ -554,7 +556,6 @@ func (r *raft) bcastHeartbeatWithCtx(ctx []byte) {
 func (r *raft) advance(rd Ready) {
 	r.reduceUncommittedSize(rd.CommittedEntries)
 
-	// If the entry to leave split joint consensus is committed, increase epoch.
 	for idx := range rd.CommittedEntries {
 		if rd.CommittedEntries[idx].Type == pb.EntryConfChangeV2 {
 			var ccv2 pb.ConfChangeV2
@@ -562,9 +563,11 @@ func (r *raft) advance(rd Ready) {
 				panic("unmarshal entry conf failed: " + err.Error())
 			}
 			if ccv2.Transition == pb.ConfChangeTransitionSplitLeave {
+				// If the entry to leave split joint consensus is committed, increase epoch.
 				oldEpoch := r.Epoch
 				r.Epoch = rd.CommittedEntries[idx].Epoch + 1
-				r.logger.Infof("epoch changed from %v to %v", oldEpoch, r.Epoch)
+				r.logger.Infof("epoch increased from %v to %v", oldEpoch, r.Epoch)
+				break
 			}
 		}
 	}
@@ -584,22 +587,19 @@ func (r *raft) advance(rd Ready) {
 			// nil Data which unmarshals into an empty ConfChangeV2 and has the
 			// benefit that appendEntry can never refuse it based on its size
 			// (which registers as zero).
-			ent := pb.Entry{
-				Type: pb.EntryConfChangeV2,
-				Data: nil,
-			}
+
+			ent := pb.Entry{Type: pb.EntryConfChangeV2}
 			if r.prs.Config.Split && r.prs.Config.Merge {
 				panic("split and merge at the same time")
-			}
-			if r.prs.Config.Split {
+			} else if r.prs.Config.Split {
 				_, data, err := pb.MarshalConfChange(pb.ConfChangeV2{
 					Transition: pb.ConfChangeTransitionSplitLeave})
 				if err != nil {
 					panic("marshal split leave entry failed: " + err.Error())
 				}
 				ent.Data = data
-			}
-			if r.prs.Config.Merge {
+				r.logger.Debugf("propose split leave")
+			} else if r.prs.Config.Merge {
 				_, data, err := pb.MarshalConfChange(pb.ConfChangeV2{
 					Transition: pb.ConfChangeTransitionMergeLeave})
 				if err != nil {
@@ -607,6 +607,27 @@ func (r *raft) advance(rd Ready) {
 				}
 				ent.Data = data
 				r.logger.Debugf("propose merge leave")
+			} else { // normal joint leave
+				es, err := r.raftLog.slice(r.currentConfMetadata.Index, r.currentConfMetadata.Index+1, noLimit)
+				if err != nil {
+					panic("find enter joint entry failed: " + err.Error())
+				}
+
+				var ccv2 pb.ConfChangeV2
+				if err = ccv2.Unmarshal(es[0].Data); err != nil {
+					panic("unmarshal enter joint entry failed: " + err.Error())
+				}
+
+				_, data, err := pb.MarshalConfChange(pb.ConfChangeV2{
+					Transition: pb.ConfChangeTransitionJointLeave,
+					Changes:    ccv2.Changes,
+					Context:    ccv2.Context,
+				})
+				if err != nil {
+					panic("marshal joint leave entry failed: " + err.Error())
+				}
+				ent.Data = data
+				r.logger.Debugf("propose joint leave")
 			}
 
 			// There's no way in which this proposal should be able to be rejected.
@@ -894,10 +915,30 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 
 	r.logger.Debugf("message from another epoch (current %d): %s", r.Epoch, m.String())
 	switch m.Type {
+	case pb.MsgHeartbeat:
+		if m.Epoch < r.Epoch {
+			// TODO: reject
+		} else {
+			term := r.Term
+			if term == 0 { // when a new join member
+				term = 1
+			}
+			r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: 1, Epoch: r.Epoch, Commit: r.raftLog.committed})
+			r.logger.Debugf("send pull request since commit index %d", r.raftLog.committed)
+			r.becomeFollower(r.Term, None)
+			return false, nil
+		}
 	case pb.MsgVote:
 		if m.Epoch < r.Epoch {
 			r.send(pb.Message{Type: voteRespMsgType(m.Type), To: m.From, Term: r.Term, Epoch: r.Epoch, Reject: true})
 		} else { // m.Epoch > r.Epoch
+			term := r.Term
+			if term == 0 { // when a new join member
+				term = 1
+			}
+			r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: 1, Epoch: r.Epoch, Commit: r.raftLog.committed})
+			r.logger.Debugf("send pull request since commit index %d", r.raftLog.committed)
+			r.becomeFollower(r.Term, None)
 			return false, nil
 		}
 	case pb.MsgVoteResp:
@@ -924,7 +965,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 		}
 	case pb.MsgPull:
 		if m.Epoch < r.Epoch {
-			if m.Commit < r.raftLog.firstIndex() {
+			if m.Commit != 0 && m.Commit < r.raftLog.firstIndex() { // if 0, that is a newly joined member
 				// TODO: send snapshot
 				r.logger.Panic("not implemented: send snapshot for pull")
 			} else {
@@ -951,7 +992,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 					}
 				}
 
-				r.logger.Panic("unable to find epoch change entry")
+				r.logger.Error("unable to find epoch change entry")
 			}
 		} else { // m.Epoch > r.Epoch
 			r.logger.Panic("pull from higher epoch %d (current %d), impossible!", m.Epoch, r.Epoch)
@@ -961,12 +1002,15 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 			r.logger.Debugf("pull resp from lower epoch %d (current %d), ignore", m.Epoch, r.Epoch)
 			return false, nil
 		} else {
+			lastEnt := m.Entries[len(m.Entries)-1]
 			firstIdx := m.Entries[0].Index
-			lastIdx := m.Entries[len(m.Entries)-1].Index
+			lastIdx := lastEnt.Index
 
 			ci := r.raftLog.findConflict(m.Entries)
 			switch {
 			case ci == 0:
+				r.raftLog.commitTo(lastIdx)
+				r.Epoch = lastEnt.Epoch + 1
 				// do nothing, entries are already included in log
 				r.logger.Debugf("ignore pulled %d entries upto index %d", lastIdx-ci+1, r.raftLog.committed)
 			case ci <= r.raftLog.committed:
@@ -1200,7 +1244,9 @@ func stepLeader(r *raft, m pb.Message) error {
 			if cc != nil {
 				alreadyPending := r.pendingConfIndex > r.raftLog.applied
 				alreadyJoint := len(r.prs.Config.Voters[1]) > 0
-				wantsLeaveJoint := len(cc.AsV2().Changes) == 0 || cc.AsV2().Transition == pb.ConfChangeTransitionSplitLeave
+				wantsLeaveJoint := len(cc.AsV2().Changes) == 0 ||
+					cc.AsV2().Transition == pb.ConfChangeTransitionSplitLeave ||
+					cc.AsV2().Transition == pb.ConfChangeTransitionMergeLeave
 
 				var refused string
 				if alreadyPending {
@@ -1865,7 +1911,11 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 		} else if autoLeave, ok := cc.EnterJoint(); ok {
 			return changer.EnterJoint(autoLeave, cc.Changes...)
 		} else if autoLeave, ok = cc.EnterSplit(); ok {
-			return changer.EnterSplit(autoLeave, r.id, cc.Changes...)
+			clrIdx, err := strconv.Atoi(string(cc.Context))
+			if err != nil {
+				panic("parse clr idx failed")
+			}
+			return changer.EnterSplit(autoLeave, clrIdx, cc.Changes...)
 		} else if cc.LeaveSplit() {
 			return changer.LeaveSplit()
 		} else if autoLeave, ok = cc.EnterMerge(); ok {

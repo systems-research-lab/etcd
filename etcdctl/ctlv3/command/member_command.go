@@ -31,6 +31,8 @@ var (
 	isLearner      bool
 	explictLeave   bool
 	leave          bool
+	add            string
+	remove         string
 )
 
 // NewMemberCommand returns the cobra command for "member".
@@ -47,6 +49,7 @@ func NewMemberCommand() *cobra.Command {
 	mc.AddCommand(NewMemberPromoteCommand())
 	mc.AddCommand(NewMemberSplitCommand())
 	mc.AddCommand(NewMemberMergeCommand())
+	mc.AddCommand(NewMemberJointCommand())
 
 	return mc
 }
@@ -148,6 +151,23 @@ func NewMemberMergeCommand() *cobra.Command {
 
 		Run: memberMergeCommandFunc,
 	}
+
+	return cc
+}
+
+// NewMemberJointCommand returns the cobra command for "member joint".
+func NewMemberJointCommand() *cobra.Command {
+	cc := &cobra.Command{
+		Use:   "joint --add <memberPeerUrls> --remove <memberIDs>",
+		Short: "Add or remove members with joint consensus",
+		Long: `Add or remove members with joint consensus 
+`,
+
+		Run: memberJointCommandFunc,
+	}
+
+	cc.Flags().StringVar(&add, "add", "", "comma seperated urls for nodes to add, one peer url for one node")
+	cc.Flags().StringVar(&remove, "remove", "", "comma seperated IDs for nodes to remove")
 
 	return cc
 }
@@ -351,6 +371,35 @@ func memberMergeCommandFunc(cmd *cobra.Command, args []string) {
 	}
 
 	_, err := mustClientFromCmd(cmd).MemberMerge(ctx, clusters)
+	cancel()
+	if err != nil {
+		cobrautl.ExitWithError(cobrautl.ExitError, err)
+	}
+}
+
+func memberJointCommandFunc(cmd *cobra.Command, args []string) {
+	if len(add) == 0 && len(remove) == 0 {
+		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("not members provided"))
+	}
+
+	addUrls := make([]string, 0)
+	if len(add) != 0 {
+		addUrls = strings.Split(add, ",")
+	}
+
+	removeIds := make([]uint64, 0)
+	if len(remove) != 0 {
+		for _, idStr := range strings.Split(remove, ",") {
+			id, err := strconv.ParseUint(idStr, 16, 64)
+			if err != nil {
+				cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("bad member ID arg (%v), expecting ID in Hex", err))
+			}
+			removeIds = append(removeIds, id)
+		}
+	}
+
+	ctx, cancel := commandCtx(cmd)
+	_, err := mustClientFromCmd(cmd).MemberJoint(ctx, addUrls, removeIds)
 	cancel()
 	if err != nil {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)

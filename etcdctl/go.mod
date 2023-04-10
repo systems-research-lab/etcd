@@ -15,7 +15,6 @@ require (
 	go.etcd.io/etcd/client/v3 v3.5.5
 	go.etcd.io/etcd/etcdutl/v3 v3.5.5
 	go.etcd.io/etcd/pkg/v3 v3.5.5
-	go.etcd.io/etcd/server/v3 v3.5.7 // indirect
 	go.uber.org/zap v1.17.0
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/grpc v1.41.0

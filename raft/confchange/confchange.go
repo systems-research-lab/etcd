@@ -129,7 +129,7 @@ func (c Changer) LeaveJoint() (tracker.Config, tracker.ProgressMap, error) {
 // EnterSplit enters a joint consensus for split. In the joint consensus,
 // the config containing current node is marked incoming one and the other
 // one will be outgoing.
-func (c Changer) EnterSplit(autoLeave bool, currId uint64, ccs ...pb.ConfChangeSingle) (
+func (c Changer) EnterSplit(autoLeave bool, incomingIdx int, ccs ...pb.ConfChangeSingle) (
 	tracker.Config, tracker.ProgressMap, error) {
 	cfg, prs, err := c.checkAndCopy()
 	if err != nil {
@@ -146,7 +146,6 @@ func (c Changer) EnterSplit(autoLeave bool, currId uint64, ccs ...pb.ConfChangeS
 		return c.err(err)
 	}
 
-	incomingIdx := -1
 	clrs := make(map[int][]uint64)
 	for _, cc := range ccs {
 		if _, ok := prs[cc.NodeID]; !ok {
@@ -162,13 +161,6 @@ func (c Changer) EnterSplit(autoLeave bool, currId uint64, ccs ...pb.ConfChangeS
 			clrs[idx] = make([]uint64, 0)
 		}
 		clrs[idx] = append(clrs[idx], cc.NodeID)
-
-		if cc.NodeID == currId {
-			incomingIdx = idx
-		}
-	}
-	if incomingIdx == -1 {
-		return c.err(fmt.Errorf("current node not found"))
 	}
 	if len(clrs) > len(cfg.Voters) {
 		return c.err(fmt.Errorf("too many clusters (%v), max is %v", len(clrs), len(cfg.Voters)))

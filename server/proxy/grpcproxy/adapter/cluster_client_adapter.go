@@ -55,3 +55,7 @@ func (s *cls2clc) MemberSplit(ctx context.Context, r *pb.MemberSplitRequest, opt
 func (s *cls2clc) MemberMerge(ctx context.Context, r *pb.MemberMergeRequest, opts ...grpc.CallOption) (*pb.MemberMergeResponse, error) {
 	return s.cls.MemberMerge(ctx, r)
 }
+
+func (s *cls2clc) MemberJoint(ctx context.Context, r *pb.MemberJointRequest, opts ...grpc.CallOption) (*pb.MemberJointResponse, error) {
+	return s.cls.MemberJoint(ctx, r)
+}

@@ -72,6 +72,7 @@ enum MessageType {
 	MsgMergeAck        = 26;
 	MsgMergeSnapReq    = 27;
 	MsgMergeSnapResp   = 28;
+	MsgShutdown        = 29;
 }
 
 message Message {
@@ -120,20 +121,22 @@ enum ConfChangeTransition {
 	// applications that want to explicitly control the transitions, for example
 	// to use a custom payload (via the Context field).
 	ConfChangeTransitionJointExplicit = 2;
+  // Leave joint consensus
+	ConfChangeTransitionJointLeave = 3;
 	// Added by shireen for dynamic quorum reconfiguration.
-	ConfChangeTransitionQuorum = 3;
+	ConfChangeTransitionQuorum = 4;
 	// Use joint consensus to split and leave automatically when entering entry is committed
-	ConfChangeTransitionSplitImplicit = 4;
+	ConfChangeTransitionSplitImplicit = 5;
 	// Use joint consensus to split and leave when requested after entering entry is committed
-	ConfChangeTransitionSplitExplicit = 5;
+	ConfChangeTransitionSplitExplicit = 6;
 	// Leave joint consensus for split
-	ConfChangeTransitionSplitLeave = 6;
+	ConfChangeTransitionSplitLeave = 7;
 	// Start merge conf change
-	ConfChangeTransitionMerge = 7;
+	ConfChangeTransitionMerge = 8;
 	// Enter joint consensus for merge
-	ConfChangeTransitionMergeEnter = 8;
+	ConfChangeTransitionMergeEnter = 9;
 	// Enter joint consensus for merge
-	ConfChangeTransitionMergeLeave = 9;
+	ConfChangeTransitionMergeLeave = 10;
 }
 
 message ConfState {

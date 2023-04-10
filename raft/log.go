@@ -22,6 +22,8 @@ import (
 )
 
 type raftLog struct {
+	id uint64
+
 	// storage contains all stable entries since the last snapshot.
 	storage Storage
 
@@ -47,17 +49,19 @@ type raftLog struct {
 // newLog returns log using the given storage and default options. It
 // recovers the log to the state that it just commits and applies the
 // latest snapshot.
+// Should only use in test.
 func newLog(storage Storage, logger Logger) *raftLog {
-	return newLogWithSize(storage, logger, noLimit)
+	return newLogWithSize(0, storage, logger, noLimit)
 }
 
 // newLogWithSize returns a log using the given storage and max
 // message size.
-func newLogWithSize(storage Storage, logger Logger, maxNextEntsSize uint64) *raftLog {
+func newLogWithSize(id uint64, storage Storage, logger Logger, maxNextEntsSize uint64) *raftLog {
 	if storage == nil {
 		log.Panic("storage must not be nil")
 	}
 	log := &raftLog{
+		id:              id,
 		storage:         storage,
 		logger:          logger,
 		maxNextEntsSize: maxNextEntsSize,
@@ -104,6 +108,38 @@ func (l *raftLog) maybeAppend(index, logTerm, committed uint64, ents ...pb.Entry
 }
 
 func (l *raftLog) append(ents ...pb.Entry) uint64 {
+	for i := range ents {
+		if ents[i].Type == pb.EntryConfChange || ents[i].Type == pb.EntryConfChangeV2 {
+			// future newly join member doesn't know which split cluster it should go,
+			// but it will only receive the entry from one cluster.
+			// Thus, we add this cluster's index to the context so the new member will know.
+			if ents[i].Type == pb.EntryConfChangeV2 {
+				var cc pb.ConfChangeV2
+				if err := cc.Unmarshal(ents[i].Data); err != nil {
+					panic("unmarshal conf change data failed: " + err.Error())
+				}
+
+				cc.ConfTerm = ents[i].Term
+				cc.ConfIndex = ents[i].Index
+				if cc.Transition == pb.ConfChangeTransitionSplitImplicit ||
+					cc.Transition == pb.ConfChangeTransitionSplitExplicit {
+					for _, change := range cc.Changes {
+						if change.NodeID == l.id {
+							cc.Context = change.Context
+							data, err := cc.Marshal()
+							if err != nil {
+								panic("marshal conf change context failed: " + err.Error())
+							}
+							ents[i].Data = data
+							l.logger.Debugf("updated enter split joint for future new member")
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
 	if len(ents) == 0 {
 		return l.lastIndex()
 	}

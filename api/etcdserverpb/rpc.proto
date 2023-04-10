@@ -187,6 +187,13 @@ service Cluster {
       body: "*"
     };
   }
+
+  rpc MemberJoint(MemberJointRequest) returns (MemberJointResponse) {
+    option (google.api.http) = {
+      post: "/v3/cluster/member/joint"
+      body: "*"
+    };
+  }
 }
 
 service Maintenance {
@@ -976,6 +983,16 @@ message MemberMergeRequest {
 message MemberMergeResponse {
   ResponseHeader header = 1;
   repeated Member members = 2 [(gogoproto.nullable) = false];
+}
+
+message MemberJointRequest {
+  repeated string addPeersUrl = 1 [(gogoproto.nullable) = false];
+  repeated uint64 removePeersId = 2 [(gogoproto.nullable) = false];
+}
+
+message MemberJointResponse {
+  ResponseHeader header = 1;
+  repeated Member members = 2;
 }
 
 message DefragmentRequest {
