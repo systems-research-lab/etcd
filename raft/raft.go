@@ -787,8 +787,8 @@ func (r *raft) becomePreCandidate() {
 }
 
 func (r *raft) becomeLeader() {
-	// temporarily for measurement
-	if r.Epoch == 2 {
+	// temporary code for split measurement
+	if _, ok := r.prs.Voters.IDs()[r.lead]; r.raftLog.lastIndex() != uint64(len(r.prs.Voters)) && !ok {
 		measure.Update() <- measure.Measure{LeaderElect: measure.Time(time.Now())}
 	}
 
@@ -1049,7 +1049,7 @@ func (r *raft) Step(m pb.Message) error {
 		if m.Type == pb.MsgVote || m.Type == pb.MsgPreVote {
 			force := bytes.Equal(m.Context, []byte(campaignTransfer))
 			inLease := r.checkQuorum && r.lead != None && r.electionElapsed < r.electionTimeout
-			if !force && inLease {
+			if !force && inLease && !r.prs.Split {
 				// If a server receives a RequestVote request within the minimum election timeout
 				// of hearing from a current leader, it does not update its term or grant its vote
 				r.logger.Infof("%x [logterm: %d, index: %d, vote: %x] ignored %s from %x [logterm: %d, index: %d] at term %d: lease is not expired (remaining ticks: %d)",
@@ -1940,6 +1940,19 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 	if err != nil {
 		// TODO(tbg): return the error to the caller.
 		panic(err)
+	}
+
+	if r.lead == r.id {
+		// optimization: append to nodes not in cluster after split
+		oldVoters := r.prs.Voters.IDs()
+		newVoters := cfg.Voters.IDs()
+		if r.lead == r.id && cc.LeaveSplit() {
+			for id := range oldVoters {
+				if _, ok := newVoters[id]; !ok {
+					r.maybeSendAppend(id, false)
+				}
+			}
+		}
 	}
 
 	confState := r.switchToConfig(cfg, prs)
