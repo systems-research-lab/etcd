@@ -10,6 +10,7 @@ import (
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/client/pkg/v3/types"
+	"go.etcd.io/etcd/pkg/v3/measure"
 	"go.etcd.io/etcd/pkg/v3/pbutil"
 	"go.etcd.io/etcd/pkg/v3/traceutil"
 	"go.etcd.io/etcd/raft/v3"
@@ -617,6 +618,8 @@ func (m *merger) handler() {
 		resps := make([]raftpb.Message, 0)
 		switch msg.Type {
 		case raftpb.MsgMergePrepare: // on participants
+			measure.Update() <- measure.Measure{MergeTxStart: measure.Time(time.Now())}
+
 			// validation and duplication check
 			state, ok := store.States[txid]
 			if ok {
@@ -693,6 +696,8 @@ func (m *merger) handler() {
 			}
 
 		case raftpb.MsgMergePrepareYes: // on coordinator
+			measure.Update() <- measure.Measure{MergeTxStart: measure.Time(time.Now())}
+
 			// validation and duplication check
 			if state.Phase != prepareYes {
 				m.lg.Debug("duplicate tx message",

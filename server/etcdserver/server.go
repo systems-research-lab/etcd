@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"go.etcd.io/etcd/pkg/v3/measure"
 	"math"
 	"math/rand"
 	"net/http"
@@ -721,6 +722,8 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		lg:        srv.lg,
 	}
 	srv.m.run()
+
+	measure.Start(srv.lg)
 
 	return srv, nil
 }

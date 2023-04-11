@@ -9,6 +9,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/pkg/errors v0.9.1 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.5
+	go.etcd.io/etcd/pkg/v3 v3.5.5
 )
 
 // Bad imports are sometimes causing attempts to pull that code.
@@ -18,3 +19,5 @@ replace go.etcd.io/etcd => ./FORBIDDEN_DEPENDENCY
 replace go.etcd.io/etcd/v3 => ./FORBIDDEN_DEPENDENCY
 
 replace go.etcd.io/etcd/client/pkg/v3 => ../client/pkg
+
+replace go.etcd.io/etcd/pkg/v3 => ../pkg

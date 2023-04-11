@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"go.etcd.io/etcd/pkg/v3/measure"
 	"go.etcd.io/etcd/raft/v3/confchange"
 	"go.etcd.io/etcd/raft/v3/quorum"
 	pb "go.etcd.io/etcd/raft/v3/raftpb"
@@ -786,6 +787,11 @@ func (r *raft) becomePreCandidate() {
 }
 
 func (r *raft) becomeLeader() {
+	// temporarily for measurement
+	if r.Epoch == 2 {
+		measure.Update() <- measure.Measure{LeaderElect: measure.Time(time.Now())}
+	}
+
 	// TODO(xiangli) remove the panic when the raft implementation is stable
 	if r.state == StateFollower {
 		panic("invalid transition [follower -> leader]")
@@ -1911,16 +1917,20 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 		} else if autoLeave, ok := cc.EnterJoint(); ok {
 			return changer.EnterJoint(autoLeave, cc.Changes...)
 		} else if autoLeave, ok = cc.EnterSplit(); ok {
+			measure.Update() <- measure.Measure{SplitEnter: measure.Time(time.Now())}
 			clrIdx, err := strconv.Atoi(string(cc.Context))
 			if err != nil {
 				panic("parse clr idx failed")
 			}
 			return changer.EnterSplit(autoLeave, clrIdx, cc.Changes...)
 		} else if cc.LeaveSplit() {
+			measure.Update() <- measure.Measure{SplitLeave: measure.Time(time.Now())}
 			return changer.LeaveSplit()
 		} else if autoLeave, ok = cc.EnterMerge(); ok {
+			measure.Update() <- measure.Measure{MergeEnter: measure.Time(time.Now())}
 			return changer.EnterMerge(autoLeave, cc.Changes...)
 		} else if cc.LeaveMerge() {
+			measure.Update() <- measure.Measure{MergeLeave: measure.Time(time.Now())}
 			return changer.LeaveMerge()
 		}
 

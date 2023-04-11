@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"go.etcd.io/etcd/pkg/v3/measure"
 	"sort"
 	"strconv"
 	"time"
@@ -334,6 +335,12 @@ func (a *applierV3backend) Range(ctx context.Context, txn mvcc.TxnRead, r *pb.Ra
 
 	resp := &pb.RangeResponse{}
 	resp.Header = &pb.ResponseHeader{}
+
+	if string(r.Key) == measure.MeasureKey {
+		resp.Kvs = make([]*mvccpb.KeyValue, 1)
+		resp.Kvs[0] = &mvccpb.KeyValue{Key: []byte(measure.MeasureKey), Value: measure.Json()}
+		return resp, nil
+	}
 
 	if txn == nil {
 		txn = a.s.kv.Read(mvcc.ConcurrentReadTxMode, trace)
