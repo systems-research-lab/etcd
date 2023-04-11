@@ -277,8 +277,12 @@ func (ms *MemoryStorage) Append(entries []pb.Entry) error {
 	case uint64(len(ms.ents)) == offset:
 		ms.ents = append(ms.ents, entries...)
 	default:
-		getLogger().Panicf("missing log entry [last: %d, append at: %d]",
-			ms.lastIndex(), entries[0].Index)
+		if ms.ents[0].Type != pb.EntryMergeConfChange {
+			getLogger().Debug("merge reset storage, ignore this batch of entries")
+		} else {
+			getLogger().Panicf("missing log entry [last: %d, append at: %d]",
+				ms.lastIndex(), entries[0].Index)
+		}
 	}
 	return nil
 }

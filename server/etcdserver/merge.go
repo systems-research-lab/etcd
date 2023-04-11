@@ -207,6 +207,7 @@ func (m *merger) apply(entry raftpb.Entry) {
 	txid := uuid.MustParse(info.Txid)
 	switch info.Type {
 	case raftpb.Prepare:
+		// TODO: detect configuration change
 		// reject concurrent tx
 		if store.Ongoing != uuid.Nil {
 			store.States[txid] = txState{Phase: prepareNo, Info: info}
