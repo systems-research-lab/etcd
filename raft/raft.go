@@ -70,6 +70,8 @@ const (
 	campaignElection CampaignType = "CampaignElection"
 	// campaignTransfer represents the type of leader transfer
 	campaignTransfer CampaignType = "CampaignTransfer"
+	// campaignSplit forces the receiver to judge if vote or not even if leass is not expired yet
+	campaignSplit CampaignType = "CampaignSplit"
 )
 
 // ErrProposalDropped is returned when the proposal is ignored by some cases,
@@ -788,7 +790,8 @@ func (r *raft) becomePreCandidate() {
 
 func (r *raft) becomeLeader() {
 	// temporary code for split measurement
-	if _, ok := r.prs.Voters.IDs()[r.lead]; r.raftLog.lastIndex() != uint64(len(r.prs.Voters)) && !ok {
+	voters := r.prs.Voters.IDs()
+	if _, ok := voters[r.lead]; !ok {
 		measure.Update() <- measure.Measure{LeaderElect: measure.Time(time.Now())}
 	}
 
@@ -897,7 +900,7 @@ func (r *raft) campaign(t CampaignType) {
 			r.id, r.raftLog.lastTerm(), r.raftLog.lastIndex(), voteMsg, id, r.Term)
 
 		var ctx []byte
-		if t == campaignTransfer {
+		if t == campaignTransfer || t == campaignSplit {
 			ctx = []byte(t)
 		}
 		r.send(pb.Message{Term: term, To: id, Type: voteMsg, Index: r.raftLog.lastIndex(), LogTerm: r.raftLog.lastTerm(), Context: ctx})
@@ -1047,7 +1050,7 @@ func (r *raft) Step(m pb.Message) error {
 		// local message
 	case m.Term > r.Term:
 		if m.Type == pb.MsgVote || m.Type == pb.MsgPreVote {
-			force := bytes.Equal(m.Context, []byte(campaignTransfer))
+			force := bytes.Equal(m.Context, []byte(campaignTransfer)) || bytes.Equal(m.Context, []byte(campaignSplit))
 			inLease := r.checkQuorum && r.lead != None && r.electionElapsed < r.electionTimeout
 			if !force && inLease && !r.prs.Split {
 				// If a server receives a RequestVote request within the minimum election timeout
@@ -1943,10 +1946,10 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 	}
 
 	if r.lead == r.id {
-		// optimization: append to nodes not in cluster after split
 		oldVoters := r.prs.Voters.IDs()
 		newVoters := cfg.Voters.IDs()
-		if r.lead == r.id && cc.LeaveSplit() {
+		if cc.LeaveSplit() && r.state == StateLeader {
+			// optimization 1: append to nodes not in cluster after split
 			for id := range oldVoters {
 				if _, ok := newVoters[id]; !ok {
 					r.maybeSendAppend(id, false)
@@ -1964,6 +1967,24 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 		r.currentConfMetadata.Index, r.currentConfMetadata.Term)
 
 	r.raftLog.storage.SetConfState(r.currentConfMetadata)
+
+	if cc.LeaveSplit() {
+		newVoters := cfg.Voters.IDs()
+		if _, ok := newVoters[r.lead]; r.lead != None && !ok {
+			// optimization 2: when a node is split out from prev leader's config,
+			// and has the larges node id, become a candidate immediately
+			campaign := true
+			for id := range newVoters {
+				if r.id < id {
+					campaign = false
+				}
+			}
+			if campaign {
+				r.logger.Debugf("campaign immediately")
+				r.campaign(campaignSplit)
+			}
+		}
+	}
 
 	return confState
 }
