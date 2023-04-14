@@ -132,6 +132,8 @@ func (m *merger) proposeMerge(ctx context.Context, r pb.MemberMergeRequest) erro
 		clusters = append(clusters, raftpb.Cluster{Id: cid, Members: membersBuf})
 	}
 
+	measure.Update() <- measure.Measure{MergeTxIssue: measure.Time(time.Now())}
+
 	return m.rn.ProposeMerge(ctx,
 		raftpb.MergeInfo{
 			Type:        raftpb.Prepare,
@@ -207,7 +209,7 @@ func (m *merger) apply(entry raftpb.Entry) {
 
 	txid := uuid.MustParse(info.Txid)
 	switch info.Type {
-	case raftpb.Prepare:
+	case raftpb.Prepare: // on both coordinator and participants
 		// TODO: detect configuration change
 		// reject concurrent tx
 		if store.Ongoing != uuid.Nil {
@@ -242,6 +244,9 @@ func (m *merger) apply(entry raftpb.Entry) {
 		store.States[txid] = txs
 		store.Ongoing = txid
 
+		sendNow = true
+
+		measure.Update() <- measure.Measure{MergeTxStart: measure.Time(time.Now())}
 		m.lg.Debug("start new merge tx",
 			zap.String("txid", txid.String()),
 			zap.Any("clusters", txs.Clusters))
@@ -267,6 +272,7 @@ func (m *merger) apply(entry raftpb.Entry) {
 
 			sendNow = true
 
+			measure.Update() <- measure.Measure{MergeTxCommit: measure.Time(time.Now())}
 			m.lg.Debug("coordinator committed merge tx",
 				zap.String("txid", txid.String()),
 				zap.Any("phase", txs.Phase),
@@ -284,6 +290,9 @@ func (m *merger) apply(entry raftpb.Entry) {
 
 		m.applyMergeConfChange(txs.Clusters, info)
 
+		sendNow = true
+
+		measure.Update() <- measure.Measure{MergeTxCommit: measure.Time(time.Now())}
 		m.lg.Debug("participant committed merge tx",
 			zap.String("txid", txid.String()),
 			zap.Any("phase", txs.Phase),
@@ -462,7 +471,7 @@ func (m merger) snapshotRequester(clusters map[types.ID][]pb.Member) {
 				m.transport.Send(reqs)
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(25 * time.Millisecond)
 	}
 }
 
@@ -494,7 +503,7 @@ func (m *merger) sender() {
 	for {
 		select {
 		case <-m.sendChan:
-		case <-time.After(1 * time.Second):
+		case <-time.After(25 * time.Millisecond):
 		}
 
 		if m.rn.Status().SoftState.Lead != uint64(m.id) {
@@ -618,8 +627,6 @@ func (m *merger) handler() {
 		resps := make([]raftpb.Message, 0)
 		switch msg.Type {
 		case raftpb.MsgMergePrepare: // on participants
-			measure.Update() <- measure.Measure{MergeTxStart: measure.Time(time.Now())}
-
 			// validation and duplication check
 			state, ok := store.States[txid]
 			if ok {
@@ -696,8 +703,6 @@ func (m *merger) handler() {
 			}
 
 		case raftpb.MsgMergePrepareYes: // on coordinator
-			measure.Update() <- measure.Measure{MergeTxStart: measure.Time(time.Now())}
-
 			// validation and duplication check
 			if state.Phase != prepareYes {
 				m.lg.Debug("duplicate tx message",
@@ -763,6 +768,9 @@ func (m *merger) handler() {
 
 		case raftpb.MsgMergeAck: // on coordinator
 			// validation ack
+			if state.Phase == ackedCommit || state.Phase == ackedAbort {
+				continue
+			}
 			if state.Phase != committed && state.Phase != aborted {
 				panic(fmt.Sprintf("should be acked but state is %v", state.Phase))
 			}

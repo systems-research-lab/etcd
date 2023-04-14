@@ -791,9 +791,15 @@ func (r *raft) becomePreCandidate() {
 func (r *raft) becomeLeader() {
 	// temporary code for split measurement
 	voters := r.prs.Voters.IDs()
-	if _, ok := voters[r.lead]; !ok {
+	if _, ok := voters[r.lead]; len(voters) == 3 && !ok {
 		measure.Update() <- measure.Measure{LeaderElect: measure.Time(time.Now())}
 	}
+
+	// temporary code for merge measurement
+	//voters := r.prs.Voters.IDs()
+	//if len(voters) != 3 {
+	//	measure.Update() <- measure.Measure{LeaderElect: measure.Time(time.Now())}
+	//}
 
 	// TODO(xiangli) remove the panic when the raft implementation is stable
 	if r.state == StateFollower {

@@ -2599,8 +2599,6 @@ func (s *EtcdServer) apply(
 			cc.ConfIndex = e.Index
 			s.m.enterJoint(cc)
 
-			//s.cluster.GenId()
-
 			s.setAppliedIndex(e.Index)
 			s.setTerm(e.Term)
 
@@ -2617,7 +2615,7 @@ func (s *EtcdServer) apply(
 				}
 				go func(cid types.ID) {
 					for !s.m.isSnapFileExists(cid) {
-						time.Sleep(10 * time.Millisecond)
+						time.Sleep(5 * time.Millisecond)
 						continue
 					}
 
@@ -2636,6 +2634,7 @@ func (s *EtcdServer) apply(
 				snapshots = append(snapshots, <-sem)
 			}
 			s.lg.Debug("received all snapshots")
+			measure.Update() <- measure.Measure{MergeSnapReceive: measure.Time(time.Now())}
 
 			txn := s.kv.Write(traceutil.Get(context.Background()))
 			for _, ss := range snapshots {
@@ -2645,6 +2644,7 @@ func (s *EtcdServer) apply(
 			}
 			txn.End()
 			s.lg.Debug("installed all snapshots")
+			measure.Update() <- measure.Measure{MergeSnapInstall: measure.Time(time.Now())}
 
 			// restore ticker stopped before apply merge conf change
 			s.r.ticker.Reset(s.r.heartbeat)
