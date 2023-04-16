@@ -116,6 +116,11 @@ var (
 	storeMemberAttributeRegexp       = regexp.MustCompile(path.Join(membership.StoreMembersPrefix, "[[:xdigit:]]{1,16}", "attributes"))
 )
 
+var (
+	mergeId = uint64(0)
+	splitId = uint64(0)
+)
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 
@@ -1511,8 +1516,13 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 
 		// when committed joint leave, member should already be removed from raft,
 		// now delete member from etcd cluster and transport
-		selfRemoved := false
-		if cc.Transition == raftpb.ConfChangeTransitionJointLeave {
+		switch cc.Transition {
+		case raftpb.ConfChangeTransitionMergeLeave:
+			s.w.Trigger(mergeId, nil)
+		case raftpb.ConfChangeTransitionSplitLeave:
+			s.w.Trigger(splitId, nil)
+		case raftpb.ConfChangeTransitionJointLeave:
+			selfRemoved := false
 			allRemove := true // if changes are all about removing nodes
 			for _, change := range cc.Changes {
 				id := types.ID(change.NodeID)
@@ -2001,13 +2011,32 @@ func (s *EtcdServer) SplitMember(ctx context.Context, clusters []pb.MemberList, 
 			}
 		}
 
-		transition := raftpb.ConfChangeTransitionSplitImplicit
 		if explictLeave {
-			transition = raftpb.ConfChangeTransitionSplitExplicit
-		}
+			transition := raftpb.ConfChangeTransitionSplitExplicit
+			if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{Transition: transition, Changes: changes}); err != nil {
+				return nil, err
+			}
+		} else {
+			transition := raftpb.ConfChangeTransitionSplitImplicit
 
-		if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{Transition: transition, Changes: changes}); err != nil {
-			return nil, err
+			splitId = s.reqIDGen.Next()
+			ch := s.w.Register(splitId)
+
+			start := time.Now()
+			if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{Transition: transition, Changes: changes}); err != nil {
+				s.w.Trigger(splitId, nil)
+				return nil, err
+			}
+
+			select {
+			case <-ch:
+				return nil, nil
+			case <-ctx.Done():
+				s.w.Trigger(splitId, nil) // GC wait
+				return nil, s.parseProposeCtxErr(ctx.Err(), start)
+			case <-s.stopping:
+				return nil, ErrStopped
+			}
 		}
 	}
 
@@ -2015,7 +2044,24 @@ func (s *EtcdServer) SplitMember(ctx context.Context, clusters []pb.MemberList, 
 }
 
 func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]membership.Member, error) {
-	return nil, s.m.proposeMerge(ctx, r)
+	mergeId = s.reqIDGen.Next()
+	ch := s.w.Register(mergeId)
+
+	start := time.Now()
+	if err := s.m.proposeMerge(ctx, r); err != nil {
+		s.w.Trigger(mergeId, nil)
+		return nil, err
+	}
+
+	select {
+	case <-ch:
+		return nil, nil
+	case <-ctx.Done():
+		s.w.Trigger(mergeId, nil) // GC wait
+		return nil, s.parseProposeCtxErr(ctx.Err(), start)
+	case <-s.stopping:
+		return nil, ErrStopped
+	}
 }
 
 func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error) {
@@ -2646,8 +2692,12 @@ func (s *EtcdServer) apply(
 			s.lg.Debug("installed all snapshots")
 			measure.Update() <- measure.Measure{MergeSnapInstall: measure.Time(time.Now())}
 
-			// restore ticker stopped before apply merge conf change
+			// restore ticker stopped when applying merge conf change
 			s.r.ticker.Reset(s.r.heartbeat)
+
+			s.setAppliedIndex(e.Index)
+			s.setCommittedIndex(e.Index)
+			s.setTerm(e.Term)
 
 		default:
 			lg := s.Logger()
