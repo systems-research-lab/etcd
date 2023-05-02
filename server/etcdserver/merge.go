@@ -412,7 +412,7 @@ func (m *merger) snapFilepath(clusterId types.ID) string {
 
 func (m *merger) isSnapFileExists(clusterId types.ID) bool {
 	_, err := os.Stat(m.snapFilepath(clusterId))
-	return !os.IsNotExist(err)
+	return err == nil || !os.IsNotExist(err)
 }
 
 func (m *merger) mustReadSnapFile(clusterId types.ID) []byte {
@@ -448,8 +448,8 @@ func (m merger) snapshotter() {
 
 func (m merger) snapshotRequester(clusters map[types.ID][]pb.Member) {
 	exists := make(map[types.ID]struct{})
+	exists[m.cluster.ID()] = struct{}{}
 	for len(exists) != len(clusters) {
-		exists[m.cluster.ID()] = struct{}{}
 		for cid, mems := range clusters {
 			if _, ok := exists[cid]; ok {
 				continue
@@ -471,7 +471,7 @@ func (m merger) snapshotRequester(clusters map[types.ID][]pb.Member) {
 				m.transport.Send(reqs)
 			}
 		}
-		time.Sleep(25 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 

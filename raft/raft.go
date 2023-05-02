@@ -573,6 +573,9 @@ func (r *raft) advance(rd Ready) {
 				break
 			}
 		}
+		if rd.CommittedEntries[idx].Type == pb.EntryMergeSnap {
+			r.campaign(campaignElection)
+		}
 	}
 
 	// If entries were applied (or a snapshot), update our cursor for
@@ -790,10 +793,10 @@ func (r *raft) becomePreCandidate() {
 
 func (r *raft) becomeLeader() {
 	// temporary code for split measurement
-	voters := r.prs.Voters.IDs()
-	if _, ok := voters[r.lead]; len(voters) == 3 && !ok {
-		measure.Update() <- measure.Measure{LeaderElect: measure.Time(time.Now())}
-	}
+	//voters := r.prs.Voters.IDs()
+	//if _, ok := voters[r.lead]; len(voters) == 3 && !ok {
+	//	measure.Update() <- measure.Measure{LeaderElect: measure.Time(time.Now())}
+	//}
 
 	// temporary code for merge measurement
 	//voters := r.prs.Voters.IDs()

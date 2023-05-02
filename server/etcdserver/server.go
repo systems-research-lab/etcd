@@ -1523,7 +1523,6 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 			s.w.Trigger(splitId, nil)
 		case raftpb.ConfChangeTransitionJointLeave:
 			selfRemoved := false
-			allRemove := true // if changes are all about removing nodes
 			for _, change := range cc.Changes {
 				id := types.ID(change.NodeID)
 				if change.Type == raftpb.ConfChangeRemoveNode {
@@ -1538,19 +1537,15 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 					} else {
 						selfRemoved = true
 					}
-				} else {
-					allRemove = false
 				}
 			}
 
-			if allRemove {
-				triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
-				if err != nil {
-					s.lg.Panic("parse conf change id failed", zap.Error(err))
-				}
-				if s.w.IsRegistered(triggerId) {
-					s.w.Trigger(triggerId, &confChangeResponse{s.cluster.Members(), nil})
-				}
+			triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
+			if err != nil {
+				s.lg.Panic("parse conf change id failed", zap.Error(err))
+			}
+			if s.w.IsRegistered(triggerId) {
+				s.w.Trigger(triggerId, &confChangeResponse{s.cluster.Members(), nil})
 			}
 
 			if selfRemoved {
@@ -1579,25 +1574,14 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 			voters[v] = struct{}{}
 		}
 
-		prevConfState := s.r.raftStorage.GetPrevConfState()
-		for _, m := range prevConfState.ConfState.VotersOutgoing {
-			if _, ok := voters[m]; !ok {
-				s.cluster.RemoveMember(types.ID(m), membership.ApplyBoth)
-			}
-		}
-		s.cluster.GenId()
-
 	case raftpb.ConfChangeTransitionJointImplicit:
 		if len(confState.VotersOutgoing) == 0 {
 			panic("Not in joint consensus! ConfState: " + confState.String())
 		}
 
 		s.Logger().Debug("apply enter joint conf change")
-		allRemove := true // if changes are all about removing nodes
 		for _, change := range cc.Changes {
 			if change.Type == raftpb.ConfChangeAddNode {
-				allRemove = false
-
 				var mem membership.Member
 				if err := gob.NewDecoder(bytes.NewBuffer(change.Context)).Decode(&mem); err != nil {
 					s.Logger().Panic("failed to unmarshal member", zap.Error(err))
@@ -1619,14 +1603,12 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 			}
 		}
 
-		if !allRemove {
-			triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
-			if err != nil {
-				s.lg.Panic("parse conf change id failed", zap.Error(err))
-			}
-			if s.w.IsRegistered(triggerId) {
-				s.w.Trigger(triggerId, &confChangeResponse{s.cluster.Members(), nil})
-			}
+		triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
+		if err != nil {
+			s.lg.Panic("parse conf change id failed", zap.Error(err))
+		}
+		if s.w.IsRegistered(triggerId) {
+			s.w.Trigger(triggerId, &confChangeResponse{s.cluster.Members(), nil})
 		}
 	}
 }
