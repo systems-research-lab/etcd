@@ -74,10 +74,10 @@ func init() {
 // to raft storage concurrently; the application must read
 // raftDone before assuming the raft messages are stable.
 type apply struct {
-	// confChangeEnts includes conf change entries that are just appended to log
-	confChangeEnts []raftpb.Entry
-	entries        []raftpb.Entry
-	snapshot       raftpb.Snapshot
+	// newConfChangeEnts includes conf change entries that are just appended to log
+	newConfChangeEnts []raftpb.Entry
+	entries           []raftpb.Entry
+	snapshot          raftpb.Snapshot
 	// notifyc synchronizes etcd server applies with the raft node
 	notifyc chan struct{}
 }
@@ -221,19 +221,19 @@ func (r *raftNode) start(localId uint64, rh *raftReadyHandler) {
 				}
 
 				// find conf change entries that appended to log but not committed
-				confChangeEnts := make([]raftpb.Entry, 0)
+				newConfChangeEnts := make([]raftpb.Entry, 0)
 				for _, ent := range rd.Entries {
 					if ent.Type == raftpb.EntryConfChange || ent.Type == raftpb.EntryConfChangeV2 {
-						confChangeEnts = append(confChangeEnts, ent)
+						newConfChangeEnts = append(newConfChangeEnts, ent)
 					}
 				}
 
 				notifyc := make(chan struct{}, 1)
 				ap := apply{
-					confChangeEnts: confChangeEnts,
-					entries:        rd.CommittedEntries,
-					snapshot:       rd.Snapshot,
-					notifyc:        notifyc,
+					newConfChangeEnts: newConfChangeEnts,
+					entries:           rd.CommittedEntries,
+					snapshot:          rd.Snapshot,
+					notifyc:           notifyc,
 				}
 
 				updateCommittedIndex(&ap, rh)

@@ -1471,14 +1471,10 @@ func (s *EtcdServer) applyEntries(ep *etcdProgress, apply *apply) {
 }
 
 func (s *EtcdServer) applyConfChangeEnts(apply *apply) {
-	if len(apply.confChangeEnts) == 0 {
-		return
-	}
-
-	for _, ent := range apply.confChangeEnts {
+	for _, ent := range apply.newConfChangeEnts {
 		switch ent.Type {
 		case raftpb.EntryConfChange:
-			s.applyConfChangeAddAndRemove(ent)
+			s.applyConfChangeV1(ent)
 		case raftpb.EntryConfChangeV2:
 			s.applyConfChangeV2(ent)
 		default:
@@ -1487,13 +1483,83 @@ func (s *EtcdServer) applyConfChangeEnts(apply *apply) {
 	}
 }
 
-func appliedConfEntryKey(entry raftpb.Entry) string {
+func confChangeEntryIdentifier(entry raftpb.Entry) string {
 	return strconv.FormatUint(entry.Epoch, 10) + "-" +
 		strconv.FormatUint(entry.Term, 10) + "-" +
 		strconv.FormatUint(entry.Index, 10)
 }
 
-func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
+func (s *EtcdServer) applyConfChangeV1(entry raftpb.Entry) (shouldStop bool) {
+	var cc raftpb.ConfChange
+	pbutil.MustUnmarshal(&cc, entry.Data)
+	cc.ConfTerm = entry.Term
+	cc.ConfIndex = entry.Index
+
+	if cc.Type != raftpb.ConfChangeAddNode &&
+		cc.Type != raftpb.ConfChangeRemoveNode {
+		s.lg.Warn("unsupported conf change v1 type", zap.Stringer("type", entry.Type))
+		return
+	}
+
+	ccid := confChangeEntryIdentifier(entry)
+	if _, ok := s.appliedConfEntry[ccid]; ok {
+		s.lg.Debug("conf change v1 entry committed", zap.String("conf-change-entry-identifier", ccid))
+
+		// when committed joint leave, member should already be removed from raft,
+		// now delete member from etcd cluster and transport
+		if cc.Type == raftpb.ConfChangeRemoveNode {
+			id := types.ID(cc.NodeID)
+			s.lg.Debug("remove node", zap.Stringer("id", id))
+
+			if !s.cluster.IsMemberExist(id) {
+				panic("remove member not exist: " + id.String())
+			}
+			s.cluster.RemoveMember(id, membership.ApplyBoth)
+
+			if s.id == id {
+				shouldStop = true
+			} else {
+				s.r.transport.Send([]raftpb.Message{{From: uint64(s.cluster.ID()), To: uint64(id), Type: raftpb.MsgShutdown}})
+				s.r.transport.RemovePeer(id)
+			}
+		}
+
+		if s.w.IsRegistered(cc.ID) {
+			s.w.Trigger(cc.ID, &confChangeResponse{s.cluster.Members(), nil})
+		}
+		return
+	}
+
+	s.lg.Debug("conf change v1 entry appended", zap.String("conf-change-entry-identifier", ccid))
+
+	s.r.ApplyConfChange(cc)
+
+	// handle conf change before committed
+	switch cc.Type {
+	case raftpb.ConfChangeAddNode:
+		confChangeContext := new(membership.ConfigChangeContext)
+		if err := json.Unmarshal(cc.Context, confChangeContext); err != nil {
+			s.lg.Panic("failed to unmarshal member", zap.Error(err))
+		}
+		if cc.NodeID != uint64(confChangeContext.Member.ID) {
+			s.lg.Panic(
+				"got different member ID",
+				zap.String("member-id-from-config-change-entry", types.ID(cc.NodeID).String()),
+				zap.String("member-id-from-message", confChangeContext.Member.ID.String()),
+			)
+		}
+
+		s.cluster.AddMember(&confChangeContext.Member, membership.ApplyBoth)
+		if confChangeContext.Member.ID != s.id {
+			s.r.transport.AddPeer(confChangeContext.Member.ID, confChangeContext.PeerURLs)
+		}
+	}
+
+	s.appliedConfEntry[ccid] = struct{}{}
+	return
+}
+
+func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 	var cc raftpb.ConfChangeV2
 	pbutil.MustUnmarshal(&cc, entry.Data)
 	cc.ConfTerm = entry.Term
@@ -1505,14 +1571,14 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 		cc.Transition != raftpb.ConfChangeTransitionSplitExplicit &&
 		cc.Transition != raftpb.ConfChangeTransitionSplitLeave &&
 		cc.Transition != raftpb.ConfChangeTransitionMergeLeave {
-		s.lg.Panic("unsupported conf change entry: " + entry.String())
+		s.lg.Warn("unsupported conf change v1 type", zap.Stringer("type", entry.Type))
 		return
 	}
 
 	var confState *raftpb.ConfState
-	key := appliedConfEntryKey(entry)
-	if _, ok := s.appliedConfEntry[key]; ok {
-		s.lg.Info("conf change v2 entry committed")
+	ccid := confChangeEntryIdentifier(entry)
+	if _, ok := s.appliedConfEntry[ccid]; ok {
+		s.lg.Debug("conf change v2 entry committed", zap.String("conf-change-entry-identifier", ccid))
 
 		// when committed joint leave, member should already be removed from raft,
 		// now delete member from etcd cluster and transport
@@ -1522,7 +1588,6 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 		case raftpb.ConfChangeTransitionSplitLeave:
 			s.w.Trigger(splitId, nil)
 		case raftpb.ConfChangeTransitionJointLeave:
-			selfRemoved := false
 			for _, change := range cc.Changes {
 				id := types.ID(change.NodeID)
 				if change.Type == raftpb.ConfChangeRemoveNode {
@@ -1531,11 +1596,12 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 						panic("remove member not exist: " + id.String())
 					}
 					s.cluster.RemoveMember(id, membership.ApplyBoth)
-					if s.id != id {
+
+					if s.id == id {
+						shouldStop = true
+					} else {
 						s.r.transport.Send([]raftpb.Message{{From: uint64(s.cluster.ID()), To: uint64(id), Type: raftpb.MsgShutdown}})
 						s.r.transport.RemovePeer(id)
-					} else {
-						selfRemoved = true
 					}
 				}
 			}
@@ -1547,33 +1613,18 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 			if s.w.IsRegistered(triggerId) {
 				s.w.Trigger(triggerId, &confChangeResponse{s.cluster.Members(), nil})
 			}
-
-			if selfRemoved {
-				go s.stopWithDelay(10*100*time.Millisecond, fmt.Errorf("the member has been permanently removed from the cluster"))
-			}
 		}
 		return
-
-	} else {
-		s.Logger().Debug("apply conf change when appended")
-		confState = s.r.ApplyConfChange(cc)
-		s.appliedConfEntry[key] = struct{}{}
-		if confState == nil {
-			return
-		}
 	}
 
+	s.lg.Debug("conf change v2 entry appended", zap.String("conf-change-entry-identifier", ccid))
+
+	confState = s.r.ApplyConfChange(cc)
 	switch cc.Transition {
 	case raftpb.ConfChangeTransitionSplitLeave:
 		if len(confState.VotersOutgoing) != 0 {
 			panic("Should already left joint consensus! ConfState: " + confState.String())
 		}
-
-		voters := map[uint64]struct{}{}
-		for _, v := range confState.Voters {
-			voters[v] = struct{}{}
-		}
-
 	case raftpb.ConfChangeTransitionJointImplicit:
 		if len(confState.VotersOutgoing) == 0 {
 			panic("Not in joint consensus! ConfState: " + confState.String())
@@ -1611,71 +1662,9 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) {
 			s.w.Trigger(triggerId, &confChangeResponse{s.cluster.Members(), nil})
 		}
 	}
-}
 
-func (s *EtcdServer) applyConfChangeAddAndRemove(entry raftpb.Entry) {
-	var cc raftpb.ConfChange
-	pbutil.MustUnmarshal(&cc, entry.Data)
-	cc.ConfTerm = entry.Term
-	cc.ConfIndex = entry.Index
-
-	key := appliedConfEntryKey(entry)
-	if _, ok := s.appliedConfEntry[key]; ok {
-		s.lg.Info("entry has already been applied")
-
-		// when committed joint leave, member should already be removed from raft,
-		// now delete member from etcd cluster and transport
-		removed := false
-		if cc.Type == raftpb.ConfChangeRemoveNode {
-			s.lg.Info("remove node entry committed, remove nodes")
-			id := types.ID(cc.NodeID)
-			if !s.cluster.IsMemberExist(id) {
-				panic("remove member not exist: " + id.String())
-			}
-			s.cluster.RemoveMember(id, membership.ApplyBoth)
-			if s.id != id {
-				s.r.transport.Send([]raftpb.Message{{From: uint64(s.cluster.ID()), To: uint64(id), Type: raftpb.MsgShutdown}})
-				s.r.transport.RemovePeer(id)
-			} else {
-				removed = true
-			}
-		}
-
-		if s.w.IsRegistered(cc.ID) {
-			s.w.Trigger(cc.ID, &confChangeResponse{s.cluster.Members(), nil})
-		}
-		if removed {
-			go s.stopWithDelay(10*100*time.Millisecond, fmt.Errorf("the member has been permanently removed from the cluster"))
-		}
-		return
-	} else {
-		s.Logger().Debug("apply conf change when appended")
-		confState := s.r.ApplyConfChange(cc)
-		s.appliedConfEntry[key] = struct{}{}
-		if confState == nil {
-			return
-		}
-	}
-
-	// handle conf change before committed
-	switch cc.Type {
-	case raftpb.ConfChangeAddNode:
-		confChangeContext := new(membership.ConfigChangeContext)
-		if err := json.Unmarshal(cc.Context, confChangeContext); err != nil {
-			s.lg.Panic("failed to unmarshal member", zap.Error(err))
-		}
-		if cc.NodeID != uint64(confChangeContext.Member.ID) {
-			s.lg.Panic(
-				"got different member ID",
-				zap.String("member-id-from-config-change-entry", types.ID(cc.NodeID).String()),
-				zap.String("member-id-from-message", confChangeContext.Member.ID.String()),
-			)
-		}
-		s.cluster.AddMember(&confChangeContext.Member, membership.ApplyBoth)
-		if confChangeContext.Member.ID != s.id {
-			s.r.transport.AddPeer(confChangeContext.Member.ID, confChangeContext.PeerURLs)
-		}
-	}
+	s.appliedConfEntry[ccid] = struct{}{}
+	return
 }
 
 func (s *EtcdServer) triggerSnapshot(ep *etcdProgress) {
@@ -2582,33 +2571,22 @@ func (s *EtcdServer) apply(
 			s.setTerm(e.Term)
 
 		case raftpb.EntryConfChange:
-			// We need to apply all WAL entries on top of v2store
-			// and only 'unapplied' (e.Index>backend.ConsistentIndex) on the backend.
-			shouldApplyV3 := membership.ApplyV2storeOnly
-
 			// set the consistent index of current executing entry
 			if e.Index > s.consistIndex.ConsistentIndex() {
 				s.consistIndex.SetConsistentApplyingIndex(e.Index, e.Term)
-				shouldApplyV3 = membership.ApplyBoth
 			}
 
-			var cc raftpb.ConfChange
-			pbutil.MustUnmarshal(&cc, e.Data)
-			cc.ConfTerm = e.Term
-			cc.ConfIndex = e.Index
-
-			if cc.Type == raftpb.ConfChangeAddNode || cc.Type == raftpb.ConfChangeRemoveNode {
-				s.applyConfChangeAddAndRemove(e)
-			} else {
-				removedSelf, err := s.applyConfChange(cc, confState, shouldApplyV3)
-				s.setAppliedIndex(e.Index)
-				s.setTerm(e.Term)
-				shouldStop = shouldStop || removedSelf
-				s.w.Trigger(cc.ID, &confChangeResponse{s.cluster.Members(), err})
-			}
+			shouldStop = shouldStop || s.applyConfChangeV1(e)
+			s.setAppliedIndex(e.Index)
+			s.setTerm(e.Term)
 
 		case raftpb.EntryConfChangeV2: // used by split
-			s.applyConfChangeV2(e)
+			// set the consistent index of current executing entry
+			if e.Index > s.consistIndex.ConsistentIndex() {
+				s.consistIndex.SetConsistentApplyingIndex(e.Index, e.Term)
+			}
+
+			shouldStop = shouldStop || s.applyConfChangeV2(e)
 			s.setAppliedIndex(e.Index)
 			s.setTerm(e.Term)
 
