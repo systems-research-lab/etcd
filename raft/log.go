@@ -109,31 +109,29 @@ func (l *raftLog) maybeAppend(index, logTerm, committed uint64, ents ...pb.Entry
 
 func (l *raftLog) append(ents ...pb.Entry) uint64 {
 	for i := range ents {
-		if ents[i].Type == pb.EntryConfChange || ents[i].Type == pb.EntryConfChangeV2 {
-			// future newly join member doesn't know which split cluster it should go,
-			// but it will only receive the entry from one cluster.
-			// Thus, we add this cluster's index to the context so the new member will know.
-			if ents[i].Type == pb.EntryConfChangeV2 {
-				var cc pb.ConfChangeV2
-				if err := cc.Unmarshal(ents[i].Data); err != nil {
-					panic("unmarshal conf change data failed: " + err.Error())
-				}
+		// future newly join member doesn't know which split cluster it should go,
+		// but it will only receive the entry from one cluster.
+		// Thus, we add this cluster's index to the context so the new member will know.
+		if ents[i].Type == pb.EntryConfChangeV2 {
+			var cc pb.ConfChangeV2
+			if err := cc.Unmarshal(ents[i].Data); err != nil {
+				panic("unmarshal conf change data failed: " + err.Error())
+			}
 
-				cc.ConfTerm = ents[i].Term
-				cc.ConfIndex = ents[i].Index
-				if cc.Transition == pb.ConfChangeTransitionSplitImplicit ||
-					cc.Transition == pb.ConfChangeTransitionSplitExplicit {
-					for _, change := range cc.Changes {
-						if change.NodeID == l.id {
-							cc.Context = change.Context
-							data, err := cc.Marshal()
-							if err != nil {
-								panic("marshal conf change context failed: " + err.Error())
-							}
-							ents[i].Data = data
-							l.logger.Debugf("updated enter split joint for future new member")
-							break
+			cc.ConfTerm = ents[i].Term
+			cc.ConfIndex = ents[i].Index
+			if cc.Transition == pb.ConfChangeTransitionSplitImplicit ||
+				cc.Transition == pb.ConfChangeTransitionSplitExplicit {
+				for _, change := range cc.Changes {
+					if change.NodeID == l.id {
+						cc.Context = change.Context // context will be the index of the cluster in split
+						data, err := cc.Marshal()
+						if err != nil {
+							panic("marshal conf change context failed: " + err.Error())
 						}
+						ents[i].Data = data
+						l.logger.Debugf("updated enter split joint for future new member")
+						break
 					}
 				}
 			}
