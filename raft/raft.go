@@ -942,7 +942,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 				term = 1
 			}
 			r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: 1, Epoch: r.Epoch, Commit: r.raftLog.committed})
-			r.logger.Debugf("send pull request since commit index %d", r.raftLog.committed)
+			r.logger.Debugf("send pull request since commit index %d at epoch %d", r.raftLog.committed, r.Epoch)
 			r.becomeFollower(r.Term, None)
 			return false, nil
 		}
@@ -987,11 +987,19 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 				// TODO: send snapshot
 				r.logger.Panic("not implemented: send snapshot for pull")
 			} else {
+				// 1. try fetch from preserved logs by given epoch
+				if entries := r.raftLog.storage.GetSplitJointEntries(m.Epoch); len(entries) != 0 && entries[0].Index > m.Commit {
+					r.send(pb.Message{Type: pb.MsgPullResp, To: m.From, Epoch: r.Epoch, Term: r.Term, Entries: entries})
+					r.logger.Debugf("send %d entries (from preserved logs) indexed from %d to %d for pull",
+						len(entries), entries[0].Index, entries[len(entries)-1].Index)
+					return false, nil
+				}
+
+				// 2. try fetch from raft logs by given commit index
 				entries, err := r.raftLog.entries(m.Commit+1, noLimit)
 				if err != nil {
 					r.logger.Panic("retrieve entries for pull failed: %v", err)
 				}
-
 				for i := len(entries) - 1; i >= 0; i-- {
 					if entries[i].Type == pb.EntryConfChangeV2 {
 						var cc pb.ConfChangeV2
@@ -1003,14 +1011,14 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 							entries = entries[:i+1]
 							r.send(pb.Message{Type: pb.MsgPullResp, To: m.From, Epoch: r.Epoch, Term: r.Term,
 								Entries: entries})
-							r.logger.Debugf("send %d entries indexed from %d to %d for pull",
+							r.logger.Debugf("send %d entries (from current logs) indexed from %d to %d for pull",
 								len(entries), entries[0].Index, entries[len(entries)-1].Index)
 							return false, nil
 						}
 					}
 				}
 
-				r.logger.Error("unable to find epoch change entry")
+				r.logger.Errorf("unable to find entries for pull from index %d", m.Commit+1)
 			}
 		} else { // m.Epoch > r.Epoch
 			r.logger.Panic("pull from higher epoch %d (current %d), impossible!", m.Epoch, r.Epoch)

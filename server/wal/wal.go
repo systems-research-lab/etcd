@@ -43,6 +43,8 @@ const (
 	snapshotType
 	//added shireen for restore corner case
 	prevconfType
+	preserveLogsType
+	confHistoryType
 
 	// warnSyncDuration is the amount of time allotted to an fsync before
 	// logging a warning
@@ -299,7 +301,7 @@ func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 	if oerr != nil {
 		return nil, oerr
 	}
-	if _, _, _, err := newWAL.ReadAll(); err != nil {
+	if _, _, _, _, _, err := newWAL.ReadAll(); err != nil {
 		newWAL.Close()
 		return nil, err
 	}
@@ -435,14 +437,15 @@ func openWALFiles(lg *zap.Logger, dirpath string, names []string, nameIndex int,
 // ReadAll may return uncommitted yet entries, that are subject to be overriden.
 // Do not apply entries that have index > state.commit, as they are subject to change.
 // verfiy the changes
-func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.Entry, err error) {
+func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.Entry,
+	preservedLogs []raftpb.PreservedLogs, confHistory []raftpb.ConfState, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	rec := &walpb.Record{}
 
 	if w.decoder == nil {
-		return nil, state, nil, ErrDecoderNotFound
+		return nil, state, nil, nil, nil, ErrDecoderNotFound
 	}
 	decoder := w.decoder
 
@@ -457,7 +460,7 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 				up := e.Index - w.start.Index - 1
 				if up > uint64(len(ents)) {
 					// return error before append call causes runtime panic
-					return nil, state, nil, ErrSliceOutOfRange
+					return nil, state, nil, nil, nil, ErrSliceOutOfRange
 				}
 				// The line below is potentially overriding some 'uncommitted' entries.
 				ents = append(ents[:up], e)
@@ -470,7 +473,7 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 		case metadataType:
 			if metadata != nil && !bytes.Equal(metadata, rec.Data) {
 				state.Reset()
-				return nil, state, nil, ErrMetadataConflict
+				return nil, state, nil, nil, nil, ErrMetadataConflict
 			}
 			metadata = rec.Data
 
@@ -480,7 +483,7 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 			// do no need to match 0 crc, since the decoder is a new one at this case.
 			if crc != 0 && rec.Validate(crc) != nil {
 				state.Reset()
-				return nil, state, nil, ErrCRCMismatch
+				return nil, state, nil, nil, nil, ErrCRCMismatch
 			}
 			decoder.updateCRC(rec.Crc)
 
@@ -490,7 +493,7 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 			if snap.Index == w.start.Index {
 				if snap.Term != w.start.Term {
 					state.Reset()
-					return nil, state, nil, ErrSnapshotMismatch
+					return nil, state, nil, nil, nil, ErrSnapshotMismatch
 				}
 				match = true
 			}
@@ -501,13 +504,24 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 			if confcm.Index == w.start.Index {
 				if confcm.Term != w.start.Term {
 					state.Reset()
-					return nil, state, nil, ErrSnapshotMismatch
+					return nil, state, nil, nil, nil, ErrSnapshotMismatch
 				}
 				match = true
 			}
+
+		case preserveLogsType:
+			var preservedBatch raftpb.PreservedLogs
+			pbutil.MustUnmarshal(&preservedBatch, rec.Data)
+			preservedLogs = append(preservedLogs, preservedBatch)
+
+		case confHistoryType:
+			var confState raftpb.ConfState
+			pbutil.MustUnmarshal(&confState, rec.Data)
+			confHistory = append(confHistory, confState)
+
 		default:
 			state.Reset()
-			return nil, state, nil, fmt.Errorf("unexpected block type %d", rec.Type)
+			return nil, state, nil, nil, nil, fmt.Errorf("unexpected block type %d", rec.Type)
 		}
 	}
 
@@ -518,13 +532,13 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 		// ErrunexpectedEOF might be returned.
 		if err != io.EOF && err != io.ErrUnexpectedEOF {
 			state.Reset()
-			return nil, state, nil, err
+			return nil, state, nil, nil, nil, err
 		}
 	default:
 		// We must read all of the entries if WAL is opened in write mode.
 		if err != io.EOF {
 			state.Reset()
-			return nil, state, nil, err
+			return nil, state, nil, nil, nil, err
 		}
 		// decodeRecord() will return io.EOF if it detects a zero record,
 		// but this zero record may be followed by non-zero records from
@@ -533,10 +547,10 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 		// were never fully synced to disk in the first place, it's safe
 		// to zero them out to avoid any CRC errors from new writes.
 		if _, err = w.tail().Seek(w.decoder.lastOffset(), io.SeekStart); err != nil {
-			return nil, state, nil, err
+			return nil, state, nil, nil, nil, err
 		}
 		if err = fileutil.ZeroToEnd(w.tail().File); err != nil {
-			return nil, state, nil, err
+			return nil, state, nil, nil, nil, err
 		}
 	}
 
@@ -563,7 +577,7 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 	}
 	w.decoder = nil
 
-	return metadata, state, ents, err
+	return metadata, state, ents, preservedLogs, confHistory, err
 }
 
 // ValidSnapshotEntries returns all the valid snapshot entries in the wal logs in the given directory.
@@ -1034,6 +1048,62 @@ func (w *WAL) SaveSnapshot(e walpb.Snapshot) error {
 	return w.sync()
 }
 
+func (w *WAL) SavePreserveLogs(ents []raftpb.Entry) error {
+	if len(ents) == 0 {
+		return nil
+	}
+
+	epoch := ents[0].Epoch
+	for _, e := range ents {
+		if e.Epoch != epoch {
+			return fmt.Errorf("epoch not the same: %v != %v", e.Epoch, epoch)
+		}
+	}
+
+	b := pbutil.MustMarshal(&raftpb.PreservedLogs{
+		Epoch:   epoch,
+		Entries: ents,
+	})
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if err := w.encoder.encode(&walpb.Record{Type: preserveLogsType, Data: b}); err != nil {
+		return err
+	}
+
+	curOff, err := w.tail().Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	if curOff < SegmentSizeBytes {
+		return w.sync()
+	}
+
+	return w.cut()
+}
+
+func (w *WAL) SaveConfHistory(confState raftpb.ConfState) error {
+	b := pbutil.MustMarshal(&confState)
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if err := w.encoder.encode(&walpb.Record{Type: confHistoryType, Data: b}); err != nil {
+		return err
+	}
+
+	curOff, err := w.tail().Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	if curOff < SegmentSizeBytes {
+		return w.sync()
+	}
+
+	return w.cut()
+}
+
 func (w *WAL) saveCrc(prevCrc uint32) error {
 	return w.encoder.encode(&walpb.Record{Type: crcType, Crc: prevCrc})
 }
@@ -1070,4 +1140,3 @@ func closeAll(lg *zap.Logger, rcs ...io.ReadCloser) error {
 	}
 	return errors.New(strings.Join(stringArr, ", "))
 }
-

@@ -34,6 +34,9 @@ type Storage interface {
 	Save(st raftpb.HardState, ents []raftpb.Entry) error
 	// SaveSnap function saves snapshot to the underlying stable storage.
 	SaveSnap(snap raftpb.Snapshot) error
+	// SavePreserveLogs function saves logs in split joint consensus.
+	SavePreserveLogs(ents []raftpb.Entry) error
+	SaveConfHistory(confState raftpb.ConfState) error
 	// Close closes the Storage and performs finalization.
 	Close() error
 	// Release releases the locked wal files older than the provided snapshot.
@@ -54,9 +57,10 @@ func NewStorage(w *wal.WAL, s *snap.Snapshotter) Storage {
 // SaveSnap saves the snapshot file to disk and writes the WAL snapshot entry.
 func (st *storage) SaveSnap(snap raftpb.Snapshot) error {
 	walsnap := walpb.Snapshot{
-		Index:     snap.Metadata.Index,
-		Term:      snap.Metadata.Term,
-		ConfState: &snap.Metadata.ConfState,
+		Index:         snap.Metadata.Index,
+		Term:          snap.Metadata.Term,
+		ConfState:     &snap.Metadata.ConfState,
+		PreservedLogs: snap.PreservedLogs,
 	}
 	// save the snapshot file before writing the snapshot to the wal.
 	// This makes it possible for the snapshot file to become orphaned, but prevents
@@ -83,7 +87,7 @@ func (st *storage) Release(snap raftpb.Snapshot) error {
 // readWAL reads the WAL at the given snap and returns the wal, its latest HardState and cluster ID, and all entries that appear
 // after the position of the given snap in the WAL.
 // The snap must have been previously saved to the WAL, or this call will panic.
-func readWAL(lg *zap.Logger, waldir string, snap walpb.Snapshot, unsafeNoFsync bool) (w *wal.WAL, id, cid types.ID, st raftpb.HardState, ents []raftpb.Entry) {
+func readWAL(lg *zap.Logger, waldir string, snap walpb.Snapshot, unsafeNoFsync bool) (w *wal.WAL, id, cid types.ID, st raftpb.HardState, ents []raftpb.Entry, preservedLogs []raftpb.PreservedLogs, confHistory []raftpb.ConfState) {
 	var (
 		err       error
 		wmetadata []byte
@@ -97,7 +101,7 @@ func readWAL(lg *zap.Logger, waldir string, snap walpb.Snapshot, unsafeNoFsync b
 		if unsafeNoFsync {
 			w.SetUnsafeNoFsync()
 		}
-		if wmetadata, st, ents, err = w.ReadAll(); err != nil {
+		if wmetadata, st, ents, preservedLogs, confHistory, err = w.ReadAll(); err != nil {
 			w.Close()
 			// we can only repair ErrUnexpectedEOF and we never repair twice.
 			if repaired || err != io.ErrUnexpectedEOF {
@@ -117,5 +121,5 @@ func readWAL(lg *zap.Logger, waldir string, snap walpb.Snapshot, unsafeNoFsync b
 	pbutil.MustUnmarshal(&metadata, wmetadata)
 	id = types.ID(metadata.NodeID)
 	cid = types.ID(metadata.ClusterID)
-	return w, id, cid, st, ents
+	return w, id, cid, st, ents, preservedLogs, confHistory
 }

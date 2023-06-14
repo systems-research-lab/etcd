@@ -117,8 +117,9 @@ var (
 )
 
 var (
-	mergeId = uint64(0)
-	splitId = uint64(0)
+	mergeId       = uint64(0)
+	splitId       = uint64(0)
+	splitEnterIdx = uint64(0)
 )
 
 func init() {
@@ -1501,6 +1502,7 @@ func (s *EtcdServer) applyConfChangeV1(entry raftpb.Entry) (shouldStop bool) {
 		return
 	}
 
+	confState := s.r.raftNodeConfig.raftStorage.GetCurrentConfState().ConfState
 	ccid := confChangeEntryIdentifier(entry)
 	if _, ok := s.appliedConfEntry[ccid]; ok {
 		s.lg.Debug("conf change v1 entry committed", zap.String("conf-change-entry-identifier", ccid))
@@ -1527,6 +1529,14 @@ func (s *EtcdServer) applyConfChangeV1(entry raftpb.Entry) (shouldStop bool) {
 		if s.w.IsRegistered(cc.ID) {
 			s.w.Trigger(cc.ID, &confChangeResponse{s.cluster.Members(), nil})
 		}
+
+		s.r.raftNodeConfig.raftStorage.AppendConf(confState)
+		if err := s.r.storage.SaveConfHistory(confState); err != nil {
+			s.lg.Panic("persist conf state failed",
+				zap.Error(err),
+				zap.Stringer("confState", &confState))
+		}
+
 		return
 	}
 
@@ -1575,7 +1585,7 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 		return
 	}
 
-	var confState *raftpb.ConfState
+	confState := s.r.raftNodeConfig.raftStorage.GetCurrentConfState().ConfState
 	ccid := confChangeEntryIdentifier(entry)
 	if _, ok := s.appliedConfEntry[ccid]; ok {
 		s.lg.Debug("conf change v2 entry committed", zap.String("conf-change-entry-identifier", ccid))
@@ -1585,8 +1595,29 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 		switch cc.Transition {
 		case raftpb.ConfChangeTransitionMergeLeave:
 			s.w.Trigger(mergeId, nil)
+
+		case raftpb.ConfChangeTransitionSplitImplicit:
+			splitEnterIdx = entry.Index
+
+		case raftpb.ConfChangeTransitionSplitExplicit:
+			splitEnterIdx = entry.Index
+
 		case raftpb.ConfChangeTransitionSplitLeave:
 			s.w.Trigger(splitId, nil)
+
+			jointEntries, err := s.r.raftStorage.Entries(splitEnterIdx+1, entry.Index+1, math.MaxUint64)
+			if err != nil {
+				s.lg.Panic("retrieve split joint entries failed",
+					zap.Error(err),
+					zap.Uint64("splitEnterIdx", splitEnterIdx),
+					zap.Uint64("splitLeaveIdx", entry.Index))
+			}
+			s.r.raftStorage.PutSplitJointEntries(entry.Epoch, jointEntries)
+
+			if err = s.r.storage.SavePreserveLogs(jointEntries); err != nil {
+				s.lg.Panic("persist split joint entries failed", zap.Error(err))
+			}
+
 		case raftpb.ConfChangeTransitionJointLeave:
 			for _, change := range cc.Changes {
 				id := types.ID(change.NodeID)
@@ -1614,12 +1645,20 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 				s.w.Trigger(triggerId, &confChangeResponse{s.cluster.Members(), nil})
 			}
 		}
+
+		s.r.raftNodeConfig.raftStorage.AppendConf(confState)
+		if err := s.r.storage.SaveConfHistory(confState); err != nil {
+			s.lg.Panic("persist conf state failed",
+				zap.Error(err),
+				zap.Stringer("confState", &confState))
+		}
+
 		return
 	}
 
 	s.lg.Debug("conf change v2 entry appended", zap.String("conf-change-entry-identifier", ccid))
 
-	confState = s.r.ApplyConfChange(cc)
+	confState = *s.r.ApplyConfChange(cc)
 	switch cc.Transition {
 	case raftpb.ConfChangeTransitionSplitLeave:
 		if len(confState.VotersOutgoing) != 0 {

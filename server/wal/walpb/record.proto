@@ -21,8 +21,8 @@ message Snapshot {
 	optional uint64 term  = 2 [(gogoproto.nullable) = false];
 	// Field populated since >=etcd-3.5.0.
 	optional raftpb.ConfState conf_state = 3;
+	repeated raftpb.PreservedLogs preservedLogs = 4 [(gogoproto.nullable) = false];
 }
-
 
 // Keep in sync with raftpb.ConfMetadata.
 message ConfMetadata {

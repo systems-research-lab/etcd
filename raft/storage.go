@@ -73,6 +73,9 @@ type Storage interface {
 	// Set the current conf state for corner case restore
 	SetConfState(currState pb.ConfMetadata) error
 
+	// GetSplitJointEntries returns preserved entries in joint consensus during split
+	GetSplitJointEntries(epoch uint64) []pb.Entry
+
 	// Get the current and previous conf state for corner case restore
 	GetPrevConfState() pb.ConfMetadata
 	GetCurrentConfState() pb.ConfMetadata
@@ -91,6 +94,11 @@ type MemoryStorage struct {
 	// ents[i] has raft log position i+snapshot.Metadata.Index
 	ents []pb.Entry
 
+	// entries during split joint consensus by epoch
+	splitJointEntries map[uint64][]pb.Entry
+
+	confHistory []pb.ConfState
+
 	//added by shireen for restore corner case
 	prevconfstate pb.ConfMetadata
 	currconfstate pb.ConfMetadata
@@ -100,7 +108,9 @@ type MemoryStorage struct {
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
 		// When starting from scratch populate the list with a dummy entry at term zero.
-		ents: make([]pb.Entry, 1),
+		ents:              make([]pb.Entry, 1),
+		splitJointEntries: make(map[uint64][]pb.Entry),
+		confHistory:       make([]pb.ConfState, 0),
 	}
 }
 
@@ -195,6 +205,13 @@ func (ms *MemoryStorage) ApplySnapshot(snap pb.Snapshot) error {
 
 	ms.snapshot = snap
 	ms.ents = []pb.Entry{{Term: snap.Metadata.Term, Index: snap.Metadata.Index}}
+
+	for _, logs := range snap.PreservedLogs {
+		ms.splitJointEntries[logs.Epoch] = logs.Entries
+	}
+
+	ms.confHistory = snap.ConfHistory
+
 	return nil
 }
 
@@ -220,6 +237,15 @@ func (ms *MemoryStorage) CreateSnapshot(i uint64, cs *pb.ConfState, data []byte)
 		ms.snapshot.Metadata.ConfState = *cs
 	}
 	ms.snapshot.Data = data
+
+	preservedLogs := make([]pb.PreservedLogs, 0)
+	for epoch, ents := range ms.splitJointEntries {
+		preservedLogs = append(preservedLogs, pb.PreservedLogs{Epoch: epoch, Entries: ents})
+	}
+	ms.snapshot.PreservedLogs = preservedLogs
+
+	ms.snapshot.ConfHistory = ms.confHistory
+
 	return ms.snapshot, nil
 }
 
@@ -285,6 +311,54 @@ func (ms *MemoryStorage) Append(entries []pb.Entry) error {
 		}
 	}
 	return nil
+}
+
+func (ms *MemoryStorage) PutSplitJointEntries(epoch uint64, ents []pb.Entry) {
+	ms.Lock()
+	defer ms.Unlock()
+
+	clone := make([]pb.Entry, 0, len(ents))
+	for i, e := range ents {
+		clone = append(clone, e)
+		copy(clone[i].Data, e.Data)
+	}
+
+	ms.splitJointEntries[epoch] = clone
+}
+
+func (ms *MemoryStorage) GetSplitJointEntries(epoch uint64) []pb.Entry {
+	ms.Lock()
+	defer ms.Unlock()
+	return ms.splitJointEntries[epoch]
+}
+
+// AddConfState add committed conf state to the history
+func (ms *MemoryStorage) AppendConf(cs pb.ConfState) {
+	ms.Lock()
+	defer ms.Unlock()
+
+	cpy := pb.ConfState{
+		Voters:         nil,
+		Learners:       nil,
+		VotersOutgoing: nil,
+		LearnersNext:   nil,
+		AutoLeave:      cs.AutoLeave,
+		Quorum:         cs.Quorum,
+		Split:          cs.Split,
+		Merge:          cs.Merge,
+	}
+	copy(cpy.Voters, cs.Voters)
+	copy(cpy.Learners, cs.Learners)
+	copy(cpy.VotersOutgoing, cs.VotersOutgoing)
+	copy(cpy.LearnersNext, cs.LearnersNext)
+
+	ms.confHistory = append(ms.confHistory, cs)
+}
+
+func (ms *MemoryStorage) GetConfHistory() []pb.ConfState {
+	ms.Lock()
+	defer ms.Unlock()
+	return ms.confHistory
 }
 
 // set the previousConfState and current confState

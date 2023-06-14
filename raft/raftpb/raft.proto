@@ -35,9 +35,16 @@ message SnapshotMetadata {
 	optional uint64    term       = 3 [(gogoproto.nullable) = false];
 }
 
+message PreservedLogs {
+	required uint64 epoch 				  = 1 [(gogoproto.nullable) = false];
+	repeated raftpb.Entry entries = 2 [(gogoproto.nullable) = false];
+}
+
 message Snapshot {
 	optional bytes            data     = 1;
 	optional SnapshotMetadata metadata = 2 [(gogoproto.nullable) = false];
+	repeated PreservedLogs    preservedLogs = 3 [(gogoproto.nullable) = false];
+	repeated ConfState        confHistory = 4 [(gogoproto.nullable) = false];
 }
 
 // For description of different message types, see:

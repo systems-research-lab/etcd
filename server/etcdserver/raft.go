@@ -546,7 +546,7 @@ func restartNode(cfg config.ServerConfig, snapshot *raftpb.Snapshot) (types.ID, 
 	if snapshot != nil {
 		walsnap.Index, walsnap.Term = snapshot.Metadata.Index, snapshot.Metadata.Term
 	}
-	w, id, cid, st, ents := readWAL(cfg.Logger, cfg.WALDir(), walsnap, cfg.UnsafeNoFsync)
+	w, id, cid, st, ents, preservedLogs, confHistory := readWAL(cfg.Logger, cfg.WALDir(), walsnap, cfg.UnsafeNoFsync)
 
 	cfg.Logger.Info(
 		"restarting local member",
@@ -562,6 +562,15 @@ func restartNode(cfg config.ServerConfig, snapshot *raftpb.Snapshot) (types.ID, 
 	}
 	s.SetHardState(st)
 	s.Append(ents)
+
+	for _, pl := range preservedLogs {
+		s.PutSplitJointEntries(pl.Epoch, pl.Entries)
+	}
+
+	for _, conf := range confHistory {
+		s.AppendConf(conf)
+	}
+
 	c := &raft.Config{
 		ID:              uint64(id),
 		ElectionTick:    cfg.ElectionTicks,
@@ -586,7 +595,7 @@ func restartAsStandaloneNode(cfg config.ServerConfig, snapshot *raftpb.Snapshot)
 	if snapshot != nil {
 		walsnap.Index, walsnap.Term = snapshot.Metadata.Index, snapshot.Metadata.Term
 	}
-	w, id, cid, st, ents := readWAL(cfg.Logger, cfg.WALDir(), walsnap, cfg.UnsafeNoFsync)
+	w, id, cid, st, ents, preservedLogs, confHistory := readWAL(cfg.Logger, cfg.WALDir(), walsnap, cfg.UnsafeNoFsync)
 
 	// discard the previously uncommitted entries
 	for i, ent := range ents {
@@ -636,6 +645,15 @@ func restartAsStandaloneNode(cfg config.ServerConfig, snapshot *raftpb.Snapshot)
 	}
 	s.SetHardState(st)
 	s.Append(ents)
+
+	for _, pl := range preservedLogs {
+		s.PutSplitJointEntries(pl.Epoch, pl.Entries)
+	}
+
+	for _, conf := range confHistory {
+		s.AppendConf(conf)
+	}
+
 	c := &raft.Config{
 		ID:              uint64(id),
 		ElectionTick:    cfg.ElectionTicks,
