@@ -1664,7 +1664,12 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 		if len(confState.VotersOutgoing) != 0 {
 			panic("Should already left joint consensus! ConfState: " + confState.String())
 		}
+	case raftpb.ConfChangeTransitionSplitExplicit:
+		splitEnterIdx = entry.Index
+
 	case raftpb.ConfChangeTransitionJointImplicit:
+		splitEnterIdx = entry.Index
+
 		if len(confState.VotersOutgoing) == 0 {
 			panic("Not in joint consensus! ConfState: " + confState.String())
 		}

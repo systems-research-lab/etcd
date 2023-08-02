@@ -988,7 +988,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 				r.logger.Panic("not implemented: send snapshot for pull")
 			} else {
 				// 1. try fetch from preserved logs by given epoch
-				if entries := r.raftLog.storage.GetSplitJointEntries(m.Epoch); len(entries) != 0 && entries[0].Index > m.Commit {
+				if entries := r.raftLog.storage.GetSplitJointEntries(m.Epoch); len(entries) != 0 && m.Commit > entries[0].Index {
 					r.send(pb.Message{Type: pb.MsgPullResp, To: m.From, Epoch: r.Epoch, Term: r.Term, Entries: entries})
 					r.logger.Debugf("send %d entries (from preserved logs) indexed from %d to %d for pull",
 						len(entries), entries[0].Index, entries[len(entries)-1].Index)
@@ -1000,7 +1000,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 				if err != nil {
 					r.logger.Panic("retrieve entries for pull failed: %v", err)
 				}
-				for i := len(entries) - 1; i >= 0; i-- {
+				for i := 0; i < len(entries); i++ {
 					if entries[i].Type == pb.EntryConfChangeV2 {
 						var cc pb.ConfChangeV2
 						if err = cc.Unmarshal(entries[i].Data); err != nil {
@@ -1224,10 +1224,10 @@ func stepLeader(r *raft, m pb.Message) error {
 		if pr := r.prs.Progress[r.id]; pr != nil {
 			pr.RecentActive = true
 		}
-		if !r.prs.QuorumActive(r.prs.Config.Quorum) {
-			r.logger.Warningf("%x stepped down to follower since quorum is not active", r.id)
-			r.becomeFollower(r.Term, None)
-		}
+		//if !r.prs.QuorumActive(r.prs.Config.Quorum) {
+		//	r.logger.Warningf("%x stepped down to follower since quorum is not active", r.id)
+		//	r.becomeFollower(r.Term, None)
+		//}
 		// Mark everyone (but ourselves) as inactive in preparation for the next
 		// CheckQuorum.
 		r.prs.Visit(func(id uint64, pr *tracker.Progress) {
