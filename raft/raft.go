@@ -937,26 +937,26 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 		if m.Epoch < r.Epoch {
 			// TODO: reject
 		} else {
-			term := r.Term
-			if term == 0 { // when a new join member
-				term = 1
-			}
-			r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: 1, Epoch: r.Epoch, Commit: r.raftLog.committed})
-			r.logger.Debugf("send pull request since commit index %d at epoch %d", r.raftLog.committed, r.Epoch)
-			r.becomeFollower(r.Term, None)
+			// term := r.Term
+			// if term == 0 { // when a new join member
+			// 	term = 1
+			// }
+			// r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: 1, Epoch: r.Epoch, Commit: r.raftLog.committed})
+			// r.logger.Debugf("send pull request since commit index %d at epoch %d", r.raftLog.committed, r.Epoch)
+			// r.becomeFollower(r.Term, None)
 			return false, nil
 		}
 	case pb.MsgVote:
 		if m.Epoch < r.Epoch {
 			r.send(pb.Message{Type: voteRespMsgType(m.Type), To: m.From, Term: r.Term, Epoch: r.Epoch, Reject: true})
 		} else { // m.Epoch > r.Epoch
-			term := r.Term
-			if term == 0 { // when a new join member
-				term = 1
-			}
-			r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: 1, Epoch: r.Epoch, Commit: r.raftLog.committed})
-			r.logger.Debugf("send pull request since commit index %d", r.raftLog.committed)
-			r.becomeFollower(r.Term, None)
+			// term := r.Term
+			// if term == 0 { // when a new join member
+			// 	term = 1
+			// }
+			// r.send(pb.Message{Type: pb.MsgPull, To: m.From, Term: 1, Epoch: r.Epoch, Commit: r.raftLog.committed})
+			// r.logger.Debugf("send pull request since commit index %d", r.raftLog.committed)
+			// r.becomeFollower(r.Term, None)
 			return false, nil
 		}
 	case pb.MsgVoteResp:
@@ -988,7 +988,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 				r.logger.Panic("not implemented: send snapshot for pull")
 			} else {
 				// 1. try fetch from preserved logs by given epoch
-				if entries := r.raftLog.storage.GetSplitJointEntries(m.Epoch); len(entries) != 0 && m.Commit > entries[0].Index {
+				if entries := r.raftLog.storage.GetSplitJointEntries(m.Epoch); len(entries) != 0 && entries[0].Index < m.Commit {
 					r.send(pb.Message{Type: pb.MsgPullResp, To: m.From, Epoch: r.Epoch, Term: r.Term, Entries: entries})
 					r.logger.Debugf("send %d entries (from preserved logs) indexed from %d to %d for pull",
 						len(entries), entries[0].Index, entries[len(entries)-1].Index)
@@ -1000,7 +1000,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 				if err != nil {
 					r.logger.Panic("retrieve entries for pull failed: %v", err)
 				}
-				for i := 0; i < len(entries); i++ {
+				for i := len(entries) - 1; i >= 0; i-- { // find the upper bound of return entries
 					if entries[i].Type == pb.EntryConfChangeV2 {
 						var cc pb.ConfChangeV2
 						if err = cc.Unmarshal(entries[i].Data); err != nil {
@@ -1033,6 +1033,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 			lastIdx := lastEnt.Index
 
 			ci := r.raftLog.findConflict(m.Entries)
+			r.logger.Debugf("Pulled entries: first index: %v, last index: %v, conflict index: %v", firstIdx, lastIdx, ci)
 			switch {
 			case ci == 0:
 				r.raftLog.commitTo(lastIdx)
@@ -1041,7 +1042,7 @@ func (r *raft) handleEpoch(m pb.Message) (bool, error) {
 				r.logger.Debugf("ignore pulled %d entries upto index %d", lastIdx-ci+1, r.raftLog.committed)
 			case ci <= r.raftLog.committed:
 				r.logger.Panicf("entry %d conflict with committed entry at %d", ci, r.raftLog.committed)
-			default:
+			default: // ci is the index of the first new entry
 				r.raftLog.append(m.Entries[ci-firstIdx:]...)
 				//r.raftLog.commitTo(lastIdx)
 				r.logger.Debugf("commit pulled %d entries upto index %d", lastIdx-ci+1, r.raftLog.committed)
@@ -1224,10 +1225,10 @@ func stepLeader(r *raft, m pb.Message) error {
 		if pr := r.prs.Progress[r.id]; pr != nil {
 			pr.RecentActive = true
 		}
-		//if !r.prs.QuorumActive(r.prs.Config.Quorum) {
-		//	r.logger.Warningf("%x stepped down to follower since quorum is not active", r.id)
-		//	r.becomeFollower(r.Term, None)
-		//}
+		if !r.prs.QuorumActive(r.prs.Config.Quorum) {
+			r.logger.Warningf("%x stepped down to follower since quorum is not active", r.id)
+			r.becomeFollower(r.Term, None)
+		}
 		// Mark everyone (but ourselves) as inactive in preparation for the next
 		// CheckQuorum.
 		r.prs.Visit(func(id uint64, pr *tracker.Progress) {

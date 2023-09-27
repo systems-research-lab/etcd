@@ -9,6 +9,7 @@ SSH_KEY_PATH = '/home/ubuntu/.ssh/id_rsa'
 
 REMOTE_ETCD_DIR = '~/etcd'
 REMOTE_SERVER_DIR = REMOTE_ETCD_DIR + '/server'
+# REMOTE_SERVER_DIR = '/mnt/ramdisk'
 
 LOCAL_ETCD_DIR = '~/go/src/go.etcd.io/etcd'
 LOCAL_SERVER_DIR = LOCAL_ETCD_DIR + '/server'
@@ -22,8 +23,8 @@ class EtcdConfig:
     port: int
     name: str
 
-    TickMs: int = 50
-    ElectionMs: int = 500
+    TickMs: int = 5
+    ElectionMs: int = 100
 
     listenClientUrls: str
     advertiseClientUrls: str
@@ -139,7 +140,7 @@ def stop(ctx, cluster_url):
     for cfg in configs:
         ip = cfg.ip
         # run_cmd(cfg.ip, 'kill -9 $({}lsof -t -i:{})'.format('' if ip == LOCAL_HOST else '/usr/sbin/', cfg.port))
-        run_cmd(cfg.ip, 'killall -9 server')
+        run_cmd(cfg.ip, 'sudo killall -9 server')
         print("stopped on " + ip)
 
 

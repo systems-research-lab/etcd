@@ -191,7 +191,7 @@ func translateWAL(lg *zap.Logger, srcWAL string, walsnap walpb.Snapshot, v3 bool
 		lg.Fatal("wal.OpenForRead failed", zap.Error(err))
 	}
 	defer w.Close()
-	wmetadata, state, ents, err := w.ReadAll()
+	wmetadata, state, ents, _, _, err := w.ReadAll()
 	switch err {
 	case nil:
 	case wal.ErrSnapshotNotFound:

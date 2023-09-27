@@ -21,3 +21,14 @@ hack/tls-setup/certs
 *.tmp
 *.bak
 .gobincache/
+
+# evaluation data
+evaluation/**/*.json
+evaluation/**/*.log
+
+# others
+**/__pycache__
+**/.vscode
+etcdctl/etcdctl
+etcdutl/utl
+server/server

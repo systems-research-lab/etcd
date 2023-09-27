@@ -7,8 +7,8 @@ from invoke import UnexpectedExit, run
 # SSH_KEY_PATH = '~/.ssh/id_rsa'
 SSH_KEY_PATH = '/home/ubuntu/.ssh/id_rsa'
 
-REMOTE_ETCD_DIR = '~/etcd'
-REMOTE_SERVER_DIR = REMOTE_ETCD_DIR + '/server'
+DEFAULT_REMOTE_SERVER_DIR = '~/etcd/server'
+# DEFAULT_REMOTE_SERVER_DIR = '/mnt/ramdisk'
 
 LOCAL_ETCD_DIR = '~/go/src/go.etcd.io/etcd'
 LOCAL_SERVER_DIR = LOCAL_ETCD_DIR + '/server'
@@ -22,8 +22,8 @@ class EtcdConfig:
     port: int
     name: str
 
-    TickMs: int = 50
-    ElectionMs: int = 500
+    TickMs: int = 5
+    ElectionMs: int = 100
 
     listenClientUrls: str
     advertiseClientUrls: str
@@ -55,7 +55,7 @@ class EtcdConfig:
             + ' --log-level=' + self.logLevel
 
 
-def parse_configs(cluster_url: str, merge: bool = False, logging: str = 'debug') -> list:
+def parse_configs(cluster_url: str, merge: bool = False, logging: str = 'panic') -> list:
     if len(cluster_url) == 0:
         print("empty cluster url")
         exit(1)
@@ -100,14 +100,14 @@ def parse_configs(cluster_url: str, merge: bool = False, logging: str = 'debug')
 
 
 @task
-def start(ctx, cluster_url, merge='false', logging='debug'):
+def start(ctx, cluster_url, merge='false', logging='debug', remoteServerDir = DEFAULT_REMOTE_SERVER_DIR):
     """
     cluster_url format: 1=http://127.0.0.1:1380,2=http://127.0.0.1:2380,3=http://127.0.0.1:3380,4=http://127.0.0.1:4380,5=http://127.0.0.1:5380,6=http://127.0.0.1:6380
     """
     merge = merge.lower() == 'true'
     configs = parse_configs(cluster_url, merge, logging)
     for cfg in configs:
-        start_config(cfg)
+        start_config(cfg, remoteServerDir)
 
 
 @task
@@ -123,9 +123,9 @@ def start_join(ctx, cluster_url, names, logging='debug'):
             start_config(cfg)
 
 
-def start_config(cfg: EtcdConfig):
+def start_config(cfg: EtcdConfig, remoteServerDir = DEFAULT_REMOTE_SERVER_DIR):
     ip = cfg.ip
-    run_cmd(ip, 'cd {} && '.format(LOCAL_SERVER_DIR if ip == LOCAL_HOST else REMOTE_SERVER_DIR) +
+    run_cmd(ip, 'ulimit -n 65535 && cd {} && '.format(LOCAL_SERVER_DIR if ip == LOCAL_HOST else remoteServerDir) +
             'nohup {} > etcd.{}.out 2>&1 &'.format('./server ' + str(cfg), cfg.name))
     print("started on " + ip)
 
@@ -139,12 +139,12 @@ def stop(ctx, cluster_url):
     for cfg in configs:
         ip = cfg.ip
         # run_cmd(cfg.ip, 'kill -9 $({}lsof -t -i:{})'.format('' if ip == LOCAL_HOST else '/usr/sbin/', cfg.port))
-        run_cmd(cfg.ip, 'killall -9 server')
+        run_cmd(cfg.ip, 'sudo killall -9 server')
         print("stopped on " + ip)
 
 
 @task
-def clean(ctx, cluster_url):
+def clean(ctx, cluster_url, remoteServerDir = DEFAULT_REMOTE_SERVER_DIR):
     """
     cluster_url format: 1=http://127.0.0.1:1380,2=http://127.0.0.1:2380,3=http://127.0.0.1:3380,4=http://127.0.0.1:4380,5=http://127.0.0.1:5380,6=http://127.0.0.1:6380
     """
@@ -153,7 +153,7 @@ def clean(ctx, cluster_url):
     configs = parse_configs(cluster_url)
     for cfg in configs:
         ip = cfg.ip
-        run_cmd(ip, 'cd {} && '.format(LOCAL_SERVER_DIR if ip == LOCAL_HOST else REMOTE_SERVER_DIR) +
+        run_cmd(ip, 'cd {} && '.format(LOCAL_SERVER_DIR if ip == LOCAL_HOST else remoteServerDir) +
                 'rm -rf data.etcd.* && rm etcd.*.out snapshot.db snapshot.db.part *-restore')
         print("cleaned on " + ip)
 
@@ -163,7 +163,7 @@ def logs(ctx, ip):
     """
     cluster_url format: 1=http://127.0.0.1:1380,2=http://127.0.0.1:2380,3=http://127.0.0.1:3380,4=http://127.0.0.1:4380,5=http://127.0.0.1:5380,6=http://127.0.0.1:6380
     """
-    os.system('scp {}:{}/etcd.*.out .'.format(ip, REMOTE_SERVER_DIR))
+    os.system('scp {}:{}/etcd.*.out .'.format(ip, DEFAULT_REMOTE_SERVER_DIR))
 
 
 def run_cmd(ip, cmd):

@@ -1,0 +1,31 @@
+# 3 types:
+#   split-performance: measure the performance improve by split
+#   split-impact: measure the performance impact by split
+#   split-load: measure the load to split
+#   merge: measure merge
+#   bench-split: split benchmark
+#   bench-merge: merge benchmark
+type: bench-merge
+
+# report folder
+folder: ../report
+
+clusters:
+  - [http://192.168.0.32:2380, http://192.168.0.40:2380, http://192.168.0.86:2380]
+  - [http://192.168.0.124:2380, http://192.168.0.154:2380, http://192.168.0.156:2380]
+  - [http://192.168.0.197:2380, http://192.168.0.122:2380, http://192.168.0.158:2380]
+  # - [http://192.168.0.224:2380, http://192.168.0.23:2380, http://192.168.0.126:2380]
+
+before: 5
+after: 5
+warmup: 3
+cooldown: 3
+threads: 0
+load: 1000 # number of k-v pairs to prepare on each cluster
+repetition: 1
+
+# benchmark specific configs
+etcdserverdir: ~/etcd/server
+etcdctlpath: ~/etcd/etcdctl/etcdctl
+etcdutlpath: ~/etcd/etcdutl/utl
+
