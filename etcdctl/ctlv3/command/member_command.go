@@ -405,3 +405,32 @@ func memberJointCommandFunc(cmd *cobra.Command, args []string) {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)
 	}
 }
+
+/*func memberJointCommandFunc(cmd *cobra.Command, args []string) {
+	if len(add) == 0 && len(remove) == 0 {
+		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("not members provided"))
+	}
+
+	addUrls := make([]string, 0)
+	if len(add) != 0 {
+		addUrls = strings.Split(add, ",")
+	}
+
+	removeIds := make([]uint64, 0)
+	if len(remove) != 0 {
+		for _, idStr := range strings.Split(remove, ",") {
+			id, err := strconv.ParseUint(idStr, 16, 64)
+			if err != nil {
+				cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("bad member ID arg (%v), expecting ID in Hex", err))
+			}
+			removeIds = append(removeIds, id)
+		}
+	}
+
+	ctx, cancel := commandCtx(cmd)
+	_, err := mustClientFromCmd(cmd).MemberJoint(ctx, addUrls, removeIds)
+	cancel()
+	if err != nil {
+		cobrautl.ExitWithError(cobrautl.ExitError, err)
+	}
+}*/
