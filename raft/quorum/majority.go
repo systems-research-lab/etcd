@@ -209,7 +209,7 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 	var q int
 	if quorum == 0 {
 		q = len(c)/2 + 1
-		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
+		fmt.Sprintf("variable quorum votesresult %[1]d\n", q) //use majority
 	} else {
 		q = int(quorum)
 		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)

@@ -68,6 +68,7 @@ func (c JointConfig) CommittedIndex(l AckedIndexer, quorum uint64) Index {
 // requires both majority quorums to vote in favor.
 func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteResult {
 	ret := VoteWon
+	//injection here of q value
 	for _, mc := range c {
 		r := mc.VoteResult(votes, quorum)
 		if r == VoteLost {

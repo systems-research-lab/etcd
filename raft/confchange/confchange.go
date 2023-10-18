@@ -50,7 +50,7 @@ type Changer struct {
 // (Section 4.3) corresponds to `C_{new,old}`.
 //
 // [1]: https://github.com/ongardie/dissertation/blob/master/online-trim.pdf
-func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.ProgressMap, error) {
+/*func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.ProgressMap, error) {
 	cfg, prs, err := c.checkAndCopy()
 	if err != nil {
 		return c.err(err)
@@ -76,6 +76,34 @@ func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker
 		return c.err(err)
 	}
 	cfg.AutoLeave = autoLeave
+	return checkAndReturn(cfg, prs)
+}*/
+
+func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.ProgressMap, error) {
+	cfg, prs, err := c.checkAndCopy()
+	if err != nil {
+		return c.err(err)
+	}
+	if joint(cfg) {
+		err := errors.New("config is already joint")
+		return c.err(err)
+	}
+	if len(incoming(cfg.Voters)) == 0 {
+		// We allow adding nodes to an empty config for convenience (testing and
+		// bootstrap), but you can't enter a joint state.
+		err := errors.New("can't make a zero-voter config joint")
+		return c.err(err)
+	}
+	// Clear the outgoing config.
+	*outgoingPtr(&cfg.Voters) = quorum.MajorityConfig{}
+	// Copy incoming to outgoing.
+	for id := range incoming(cfg.Voters) {
+		outgoing(cfg.Voters)[id] = struct{}{}
+	}
+
+	if err := c.apply(&cfg, prs, ccs...); err != nil {
+		return c.err(err)
+	}
 	return checkAndReturn(cfg, prs)
 }
 
