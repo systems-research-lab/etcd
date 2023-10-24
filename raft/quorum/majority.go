@@ -207,10 +207,10 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 		}
 	}
 	var q int
-	q = 3
+	q = 3 //hard coded value for testing
 	if quorum == 0 {
-		q = len(c)/2 + 1
-		fmt.Sprintf("variable quorum votesresult %[1]d\n", q) //use majority
+		q = len(c)/2 + 1 //this may not fully implement Shrieen's quorum formula. this appears to be majority quorum value only.
+		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
 	} else {
 		q = int(quorum)
 		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
