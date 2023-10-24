@@ -81,6 +81,7 @@ type Config struct {
 	LearnersNext map[uint64]struct{}
 
 	//added by shireen for configuration change
+	//quorum is stored in tracker
 	Quorum uint64
 }
 
