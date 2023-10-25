@@ -211,8 +211,12 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 	if quorum == 0 {
 		q = len(c)/2 + 1 //this may not fully implement Shrieen's quorum formula. this appears to be majority quorum value only.
 
-		//calculation from Shireens report, need to pass in  the number of nodes to be added
-		//q = (c-1)/2 + add  - len(c)/2 + 2
+		//calculation from Shireens report
+		//len(c) = n = number of nodes
+		//failed nodes = (len(c)-2)/2 = f from shireens report
+		//add = need to pass in  the number of nodes to be added
+		//len(c)/2 + 1 = Q0 = old quorum size
+		//q = (len(c)-1)/2 + add  - len(c)/2 + 1 + 1
 
 		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
 	} else {
