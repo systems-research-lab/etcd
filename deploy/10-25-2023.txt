@@ -1,0 +1,717 @@
+Last login: Tue Oct 10 18:21:09 on ttys002
+kang@JHankyucBookAir ~ % cat joshua.pem 
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAtUthdBTZdT1JsrXHR7pEI4/bppKxJMUuZw2/rlV8onTWUh1n
+KgPdTooPKcwGel6PKmB0zU0H7XL6F4C418irSUQgkmGSv0/skfCd/blv8Vf8BiPi
+faezVlutmW4D6SFmtaW9PKX6CM0NzN3pw8MOeAhg+dUvs+ggnhUvj1eJkLToBFXK
+PUPj2ysAN+dPKnrXgT78k0D/Yj53imzEXyFZhaULwBlcWuq5wrZvjGT5Ennwd53k
+KzFvg2vmf3gNBgenO0tth4AMENKeDunAJdhTxjQT1TZS/r/lAV4l2g02iYHMMx8a
+H5qzb+pW6kK2Re6refA9grxxJlAmfPBRxcLVzwIDAQABAoIBAFX3HIrSqBqzqRKY
+p5oXdN/4AwuFW4I4DbzIBDBCUQsno8jkMFr34iSvymjjWd8En5ZUjo4bDLtHXddv
+LjcD7FSdfWRr6A3XdDHvirsZBz/FnLe8pFU5BAzbBAJQ7IHLWMyhfo4Xlew+b2DJ
+iWNORrocHv/YWvpQA8dx/E9YDt8SXJ6s30ZdP3SSZ65t8n9KE2voRNySuf5h9jAS
+Em5htQ1ds/fQtd5vtnXcnbMeJy4tatApbnXHHkrlvNiCOwOowrUu+pcbsEAQ09mv
+Qy3SNQ6ojWbYGa7Jps5jcKA++nk9uhOXobNkRenQBP+Psc8rjEuNDVeSf4pF5HGW
+BitDGuECgYEA5AkhxTQuwFCsjEYB6X+K4Y/IOPUwDarZc4XURZiszOjl3nBGWM/i
+3L6kiD7zHOutydNoTwDfMauc2KLJAlryF6Q3xBOLG8voNArzwfxVVL0UND3mCbxl
+NLZ+YycCLLpgxhcX93fGHEOmYyO2Iw4wWwPG22W24tJLQWm2Qxh0KUsCgYEAy4bf
+SQ25c+13APhoNPSL1PFEzakkKq4rJfD0V+OEb8EirfEdu+FzDA7A+nMTmY3MgVgG
+AxkTGyDlGc4Pl+prNxlzrzPIEF2vsf5mQFpNKarvmVfvgNuEp9tIKK/RL6K1cWN8
+TNdt1kpu3WetFj3+Nix4l1uZDdgTquuIav8VFw0CgYAIdWpCRWhCi/uKjII/phKB
+wXKc4kNxDlhYl6tDFaG7TBxSvvltC/EPXSb/Qs6D0R42MVhaLd8ZmZMM2iT4qGT4
+iYfkBxGO62Zmn81g8bo8lXLtaSpiTBG4/df8V5MWE6fJUUv7Sv8XR08huE5mSH10
+stQqiUBac5CFEaXIIV0VtwKBgQCpVCve/rEllxKkVwdzz2WrI5RHuwphDAjQBzlz
+CdJ8m+X7a5h+YOKzzG6XsDhFT+kuT4qo9yqjLmoNXxgwHxNWgzFxOZagryFm6C4w
+KjD6ksHHBZc40On8MX9Ggoh6pldo4AlhcPZsC/9S61fhInCmp7cozkd3cidi05Tq
+2BC23QKBgBPNgWrTLkJVjk/jRYKsaPIkcuRB8NcXNfP0meNJXUksiGwQRNrVU2jy
+WGVMlr1kbvyykxBp1M0gaWxtTVvyDj4hFFA8pB7GaKFysTFRR0kHbbT9AQ0c515b
+N1L4raFlpfu1l6y1JdR777n9g5pRZDfxSvGhFj0d/NUB/RJCOnSP
+-----END RSA PRIVATE KEY-----
+kang@JHankyucBookAir ~ % mv joshua.pem .ssh
+kang@JHankyucBookAir ~ % ls
+Applications				etcd-client-jk.pem
+Creative Cloud Files			gday
+Desktop					go
+Documents				greetings
+Downloads				hello
+Google Drive				id_rsa
+Hello2					java_error_in_goland.hprof
+Internal_6_22.docx			kv2_server
+Library					kv_server
+Movies					kv_server3
+Music					kv_server_2
+OneDrive - Northeastern University	kv_server_999
+OneDrive - University of Tennessee	lock2service
+OneDrive - brandeis.edu			lock_server
+Payslip.pdf				lock_server 2.zip
+Pictures				lock_server.zip
+Public					myDir.txt
+app_test				pb2service
+eclipse					salutations
+eclipse-workspace
+kang@JHankyucBookAir ~ % cd .ssh
+kang@JHankyucBookAir .ssh % ls
+config				id_rsa_nerc ubuntu@199.94.60.20
+id_rsa.pub			id_rsa_nerc ubuntu@199.94.60.81
+id_rsa_NERC_new			id_rsa_nerc.pub
+id_rsa_NERC_new.pub		joshua.pem
+id_rsa_nerc			known_hosts
+id_rsa_nerc jk@199.94.60.20	known_hosts.old
+id_rsa_nerc jk@199.94.60.81	kz_client
+kang@JHankyucBookAir .ssh % rm id_rsa.pub
+kang@JHankyucBookAir .ssh % rm id_rsa_NERC_new 
+kang@JHankyucBookAir .ssh % ls
+config				id_rsa_nerc ubuntu@199.94.60.81
+id_rsa_NERC_new.pub		id_rsa_nerc.pub
+id_rsa_nerc			joshua.pem
+id_rsa_nerc jk@199.94.60.20	known_hosts
+id_rsa_nerc jk@199.94.60.81	known_hosts.old
+id_rsa_nerc ubuntu@199.94.60.20	kz_client
+kang@JHankyucBookAir .ssh % rm id_rsa_NERC_new.pub 
+kang@JHankyucBookAir .ssh % rm id_rsa_nerc
+kang@JHankyucBookAir .ssh % ls                        
+config				id_rsa_nerc.pub
+id_rsa_nerc jk@199.94.60.20	joshua.pem
+id_rsa_nerc jk@199.94.60.81	known_hosts
+id_rsa_nerc ubuntu@199.94.60.20	known_hosts.old
+id_rsa_nerc ubuntu@199.94.60.81	kz_client
+kang@JHankyucBookAir .ssh % rm id_rsa_nerc.pub 
+kang@JHankyucBookAir .ssh % rm kz_client 
+kang@JHankyucBookAir .ssh % ls
+config				id_rsa_nerc ubuntu@199.94.60.81
+id_rsa_nerc jk@199.94.60.20	joshua.pem
+id_rsa_nerc jk@199.94.60.81	known_hosts
+id_rsa_nerc ubuntu@199.94.60.20	known_hosts.old
+kang@JHankyucBookAir .ssh % rm id_rsa_nerc\ jk@199.94.60.
+rm: id_rsa_nerc jk@199.94.60.: No such file or directory
+kang@JHankyucBookAir .ssh % 
+kang@JHankyucBookAir .ssh % rm id_rsa_nerc\ jk@199.94.60.20
+kang@JHankyucBookAir .ssh % rm id_rsa_nerc\ jk@199.94.60.81 
+kang@JHankyucBookAir .ssh % rm id_rsa_nerc\ ubuntu@199.94.60.20
+kang@JHankyucBookAir .ssh % ls
+config				known_hosts
+id_rsa_nerc ubuntu@199.94.60.81	known_hosts.old
+joshua.pem
+kang@JHankyucBookAir .ssh % rm id_rsa_nerc\ ubuntu@199.94.60.81 
+kang@JHankyucBookAir .ssh % ls
+config		joshua.pem	known_hosts	known_hosts.old
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem 199.94.60.202
+ssh: connect to host 199.94.60.20 port 22: Network is unreachable
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem ubuntu@199.94.60.202
+ssh: connect to host 199.94.60.20 port 22: Network is unreachable
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem ubuntu@192.168.0.203 
+ssh: connect to host 199.94.60.20 port 22: Network is unreachable
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem ubuntu@199.94.60.202
+ssh: connect to host 199.94.60.20 port 22: Network is unreachable
+kang@JHankyucBookAir .ssh % cat config 
+HostName 199.94.60.20
+    Host 199.94.60.20
+    User jk
+    IdentityFile ~/.ssh/id_rsa_NERC_new
+kang@JHankyucBookAir .ssh % rm config
+kang@JHankyucBookAir .ssh % ls
+joshua.pem	known_hosts	known_hosts.old
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem ubuntu@199.94.60.202
+The authenticity of host '199.94.60.202 (199.94.60.202)' can't be established.
+ED25519 key fingerprint is SHA256:VyHZKmlZN136dYdJ/JeR5AqUIzYgYhwvoyv1Zq71ZKs.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '199.94.60.202' (ED25519) to the list of known hosts.
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Permissions 0644 for 'joshua.pem' are too open.
+It is required that your private key files are NOT accessible by others.
+This private key will be ignored.
+Load key "joshua.pem": bad permissions
+ubuntu@199.94.60.202: Permission denied (publickey,gssapi-keyex,gssapi-with-mic).
+kang@JHankyucBookAir .ssh % chmod go= joshua.pem
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem ubuntu@199.94.60.202
+ubuntu@199.94.60.202: Permission denied (publickey,gssapi-keyex,gssapi-with-mic).
+kang@JHankyucBookAir .ssh % chmod 400 joshua.pem
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem ubuntu@199.94.60.202
+ubuntu@199.94.60.202: Permission denied (publickey,gssapi-keyex,gssapi-with-mic).
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem 199.94.60.202 
+kang@199.94.60.202: Permission denied (publickey,gssapi-keyex,gssapi-with-mic).
+kang@JHankyucBookAir .ssh % cd ..  
+kang@JHankyucBookAir ~ % chmod 700 .ssh
+kang@JHankyucBookAir ~ % ssh -i joshua.pem 199.94.60.202
+Warning: Identity file joshua.pem not accessible: No such file or directory.
+kang@199.94.60.202: Permission denied (publickey,gssapi-keyex,gssapi-with-mic).
+kang@JHankyucBookAir ~ % cd .ssh
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem 199.94.60.202
+kang@199.94.60.202: Permission denied (publickey,gssapi-keyex,gssapi-with-mic).
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem ubuntu@192.168.0.181
+ssh: connect to host 192.168.0.181 port 22: Network is unreachable
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem ubuntu@192.168.0.181
+ssh: connect to host 192.168.0.181 port 22: Network is unreachable
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem 192.168.0.181 
+ssh: connect to host 192.168.0.181 port 22: Network is unreachable
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem 199.94.60.81 
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that a host key has just been changed.
+The fingerprint for the ED25519 key sent by the remote host is
+SHA256:HFNaDIqwF+MDxE5YfMbFbRXlPjU8hRLH8EevMZefzwA.
+Please contact your system administrator.
+Add correct host key in /Users/kang/.ssh/known_hosts to get rid of this message.
+Offending ECDSA key in /Users/kang/.ssh/known_hosts:12
+Host key for 199.94.60.81 has changed and you have requested strict checking.
+Host key verification failed.
+kang@JHankyucBookAir .ssh % cat knownhost                  
+cat: knownhost: No such file or directory
+kang@JHankyucBookAir .ssh % ls
+joshua.pem	known_hosts	known_hosts.old
+kang@JHankyucBookAir .ssh % cat known_hosts
+[moa3.eecs.utk.edu]:6322 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOGlHnq6sEHsWedM8wfCmT8RDbxWga2f83sGFByZQVKE
+[moa3.eecs.utk.edu]:6322 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC2bF1nzyioN+H6CzMR7aBr5U/Mkk1JenZRqkpAUxD6pz1dnW/fdWZZ9UZfTkeJvDSCeDNfxepOuu/NzCRd1ATrj+PZ/RPLdzW+e+d+40v8w4EQSwCJnDcd1vucYXA85dO4fOxNRQ8VbHXJqxcZJis1Mfz/Hoiwpkp6O+f8/GRu05AdWmf+f/3vKxlOgX3+lluJdtKsMQPizG7HNdrgTnE5H0cqQ8eE3G/td2OXkqnqi+pGzHekZfrJNMQ5M7O3e+Tpx40XZ8rcOKHH+B+G3pFEATPNP2B5kXkjMFGnU7fBxTG1AVoROQCHjeX3DnQTS5dZl9cPTSbJfpxPqAUwjgkR4C9gAEjgG9aeurKclbYlOBTV2c/yPzfGypF9CUdyYT7CDv3zXu5aWBVImYJmw03P4BetmvtmY7qtKu9jVWU5KywBJ8nSMe8xPd92FnNT9LGr9FyEiqDxUKnLQd+DNLV7NJPFkNTNyAo6/21HsLrtDfuCBxQPaaJcmvuRPnlx4ok=
+[moa3.eecs.utk.edu]:6322 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMiB3P93RO+bv8P0/sGoLO4aNcAiitDG4dMQVlDVJBJyOaFdYDYLJIu3D7bEEGmo3ZS1IsQvc1an+Im7eVYrGHo=
+[moa1.eecs.utk.edu]:6022 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEfyfaZHClcfFNv2nKHxCFtyhwwJzidJPCbxOOzPha0S
+[moa1.eecs.utk.edu]:6022 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDMcnDFmJPX3KKR0cnFAn2+18ctQY+uIz15I3KKchraWdFXYTmfSCQW+UfgpY98MJjDUPEj8RyC+dh5mKq1xr50QHOPzPvw7m5SBy8BnVe/FEYoOLORQM5Q26WEGjI1tYYcdU7FSse3qkrkwU0SWl+5tMG8rxTY6jgmeXuppAwvMRH21L/VktGtAkIMh0avDagPn8gDoJWcfW0+KX3MLsMR63RkGaiTaHpUp+Q+qLBfiv/RjbaXUDPu6MZC/bfFBnNPpUdOdO2bCOsEWADW6riEjRcgeAZusbUFS/Q8DChUueZ5475Ylac/jfHTPEKbF5E2mq8kUPt/g8glJTzHCEB9lScyfeYN8O3VHJPMGxBoVoerEXfV4a7l0s9IJp2SiftnTmagg4pnGhwrkJgtZAoa8RyToWD493ylqIcW0ClIRTYKC2WQnJrrmWBPs3FI43OKMfHknIDIuv1pjbiyUhfwIdXR5eVFQQ+zS6hSDjV1CAGNz4oyBsCYoB8k/SQusqU=
+[moa1.eecs.utk.edu]:6022 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFzLDcXAxArlJUM/0SG2rZciz18/VAl5V1Tcd7XNpG+n2pCROYDt10qGFgrSbPQ8TXnRBuhLSjItKAMie61xZkM=
+[moa7.eecs.utk.edu]:16722 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHHLUyJ9i4s8vqHvWzWmHOyXxnpMaNe1ZOlxY7yqANb8
+[moa7.eecs.utk.edu]:16722 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCsrm5J6Wx8iexnQSDcHrf447MfudyqVYTqcQiTl4Y1ljBj3D3jVjoLP7eVe78UtZrJJyvQHJGrwcyb2v3BJMljDWXnrsWYVPjoEn0x4clIq5I2ERyrTB6b3h+x+wYu2TU23fnMRy38ZF29Y+1R61ILCErxZEDqHxF88gKZF2fpPbyJ/mRaNDaetBhbd2lwNApfhz+PbzJThWYMIQLptFkpof/S0q/tIaEgVhXKbnXbngjKPsvuLvAyukmLXZOlt2shLnK4OxiHs+hWszX2raPfatIvwvn7LlL/TZ9XOgWgX/ktstLr4nYHvPKGARfMk3O6km4PdNIqyf9pthCljdZfbOHlAT/Xd5WbzUG/9SQlnKCKmBjJQBsizT/JlsAsfjRmjvNG7j5bZj3JxBZI2t5SF3FUI1QZPrjY/kHppFEm63I8a8w/1Ea1LLqncDjcjsIxOxRxWSS7iIRFzEQJF1mRkFwAUJPdNTgo6biEod8NS170u9GjcjXefnEy1eBV/kc=
+[moa7.eecs.utk.edu]:16722 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFaJ+G7/xH1JQrOnX7dhkdYlkIi6Z/R545W3pGsflwY0kEZXr4L6h6UOzwa4vXQZlvOkCSNUMIrYGSQ2Z9q4XZo=
+199.94.60.81 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEijZt9hmBhbNRdf35oYltWt3zgFu5L85Q9zlme2MgGo
+199.94.60.81 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDb3JB/bG8ObbrC3At40r5ChuToXnCyugPriyxzJGCsYN0mjTa6oyjkB7nj4oqc/X471M8TIxDfhu+6idEPoP949gK3q3tG5gb/PaaVKPm7adi4mSshqgWwcrOKT7C7Sil9Ojc20TmExHmk4NexCUy4JUXO2BJZyjarmrBYn5xS1+J7j5mGwaoZQCiq4KYsIBr5mPKWTUYERDFgWZKDuD6zeq29/P9eq/nll2JprJxEPJU6u5SROi3zfKwsBSdFAxVbh1IYDyJIxYhqbVkGEnlnA71n/J62Fhkr1dJCYzLkgZpvXdL/tzukMv0kVClgKw4qpKlhkjj96meJHd7pKZnkpGAV81BRBAzV+Gunzc8tHUj4x1HXBBzipRalIZ7bHf3G7I295K96FWR6ojB1FxZhZZUjiKgvr4bCaO/yQALPo7Bng3DCIaFlQwNhOG5t4tkAf0CkJlUnDHltexKbGRO2AeCld345f6o5FLEsdvSjv5kgJVKkkvWbkNhwYEvFRFE=
+199.94.60.81 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEiF3vIZU0IkX1XjUqGGgmQcgYUuUGX6n6bR2w9VJN3xPib9DYE1T160+d/L+9Rd+yBQ113zWculmSgx9OXFBWA=
+199.94.60.133 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFY6RqmZprATRSLATsFEXb1D1S1+zWt9Y/F0HQmdR37Z
+199.94.60.20 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMXx6PBOjLqKWuw1JExZ5Q2jHTgeFTy6L8KJtoSXuu0
+199.94.60.20 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDMPcPe/9D9HAm52y0EcawdP9+YNXS7kQK8zHoS/8McYgICjyy31quZJSz7XIZKYgPIcKDC/9uj44OK/xQ7rtrgTmR6KYs3EvGycgHB2o4cXQN/4y3mywOSKO+H0NO8InzxG66KS6PB/9UcObBt26tIGgfbdqE9Jn7nWVG6HC7cabz/ydo/+a0PQgN5RkF1+Rx4WnanZh/xudee5/D1+wK6Gw8TuF7tCG6UBhsIRnHKViX8YNbytW6Jxn5aJ3Gn7/Lw9V4aHcHOpigcMYaouwa+uW+vx2rz2jv/4pzyZ0WW2vuJSnzfLFBLZm6TyrP5X35RQfgKcDvmz+8539cdSGak39Nq22TVwVQVRrCM4qLlxFMCMR8bmwwh0nBgI3wju017nAK3pN7mzb3UIQEYsERkgy614DIPqZ5D4X0b+DJSGaRAKXHQk6wHy4uo9SbQRKjTYAhp1uneOjmnmDaeIV9XDuJJtZyAu3ReC/Dfbtb+vtrf6nXmA2tUw4xpe7ZxwSc=
+199.94.60.20 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOW9P90Js6bsfrAMA5L0QsyX8CTdN/b47vI3oHmUrOmDwiGWRHP+rkjoZp45ZnHg9trQy3P1GkRyOPpjUyiFlyc=
+linux-077.khoury.northeastern.edu ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPXIm2OaYTaqHqbzngafIpw/xhg1/rXRlTCimBDGC7hQ
+linux-077.khoury.northeastern.edu ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDdFj4qaGJmcPkzQ+6Q7/jf2HFepBNWfyznj8jgqgwZX8HRaguFgHssYdWuYY7OSYCL4oS13e6jVs2EyCqjmpV95wLL9VOJ8PArDYXhkzaB28d+me4M4LJv/itrGlnES9otzoOhKmFG843R+f3ELjtOI9OS09mNkAJlWLiiHoQaxJRASFHH4wWbdVCJV2qbOeSB8jpAAaLh5QJ4EDIncKydHcD9XJ4IG+R8No8KTRhtjzkbqrBI7gtmpGVk+DWfk8SIBi51lGsdST5BQ6L6Jd+BHV/poFCl9z5OHPAt8YSLHnfOxkU1ajUaQONQmQ8ea78dp9xjk7XJiqPD2yopuR238u9nenpYXo/Yl5CNGboFTXmfIzq2Gq3A30APWS7QW6Ta0yrZlbC3ZlyaxADsIN/YOWNqkSRPC3eaNtDpG6dm7HGlWvhRMPvUWOZecGzT3ZrXvkJtg0+/dHB1+lZjI2Jl21LYwrIQcK1NYu36yIHYboizi5a10+Dos8+oKGrPyHU=
+linux-077.khoury.northeastern.edu ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBD1u9Aj/e3jB7/93qAvWutG/qlKPLsYcHDkGjjELZ6UHjxp17rMHuXGZgC3hcWZj1sQV9EBgsTrVNx1tnRv4YAY=
+199.94.60.202 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINLJvA4GWwpC0aO4QaIYTTz+y7ymJFaNUnfIRqyv6R0c
+kang@JHankyucBookAir .ssh % vi known_hosts
+kang@JHankyucBookAir .ssh % ssh -i joshua.pem 199.94.60.81
+The authenticity of host '199.94.60.81 (199.94.60.81)' can't be established.
+ED25519 key fingerprint is SHA256:HFNaDIqwF+MDxE5YfMbFbRXlPjU8hRLH8EevMZefzwA.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '199.94.60.81' (ED25519) to the list of known hosts.
+kang@199.94.60.81: Permission denied (publickey).
+kang@JHankyucBookAir .ssh % ssh -i .ssh/joshua.pem 199.94.60.81
+Warning: Identity file .ssh/joshua.pem not accessible: No such file or directory.
+kang@199.94.60.81: Permission denied (publickey).
+kang@JHankyucBookAir .ssh % ssh -i .ssh/joshua.pem 199.94.60.81
+Warning: Identity file .ssh/joshua.pem not accessible: No such file or directory.
+kang@199.94.60.81: Permission denied (publickey).
+kang@JHankyucBookAir .ssh % cat joshua.pem 
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAtUthdBTZdT1JsrXHR7pEI4/bppKxJMUuZw2/rlV8onTWUh1n
+KgPdTooPKcwGel6PKmB0zU0H7XL6F4C418irSUQgkmGSv0/skfCd/blv8Vf8BiPi
+faezVlutmW4D6SFmtaW9PKX6CM0NzN3pw8MOeAhg+dUvs+ggnhUvj1eJkLToBFXK
+PUPj2ysAN+dPKnrXgT78k0D/Yj53imzEXyFZhaULwBlcWuq5wrZvjGT5Ennwd53k
+KzFvg2vmf3gNBgenO0tth4AMENKeDunAJdhTxjQT1TZS/r/lAV4l2g02iYHMMx8a
+H5qzb+pW6kK2Re6refA9grxxJlAmfPBRxcLVzwIDAQABAoIBAFX3HIrSqBqzqRKY
+p5oXdN/4AwuFW4I4DbzIBDBCUQsno8jkMFr34iSvymjjWd8En5ZUjo4bDLtHXddv
+LjcD7FSdfWRr6A3XdDHvirsZBz/FnLe8pFU5BAzbBAJQ7IHLWMyhfo4Xlew+b2DJ
+iWNORrocHv/YWvpQA8dx/E9YDt8SXJ6s30ZdP3SSZ65t8n9KE2voRNySuf5h9jAS
+Em5htQ1ds/fQtd5vtnXcnbMeJy4tatApbnXHHkrlvNiCOwOowrUu+pcbsEAQ09mv
+Qy3SNQ6ojWbYGa7Jps5jcKA++nk9uhOXobNkRenQBP+Psc8rjEuNDVeSf4pF5HGW
+BitDGuECgYEA5AkhxTQuwFCsjEYB6X+K4Y/IOPUwDarZc4XURZiszOjl3nBGWM/i
+3L6kiD7zHOutydNoTwDfMauc2KLJAlryF6Q3xBOLG8voNArzwfxVVL0UND3mCbxl
+NLZ+YycCLLpgxhcX93fGHEOmYyO2Iw4wWwPG22W24tJLQWm2Qxh0KUsCgYEAy4bf
+SQ25c+13APhoNPSL1PFEzakkKq4rJfD0V+OEb8EirfEdu+FzDA7A+nMTmY3MgVgG
+AxkTGyDlGc4Pl+prNxlzrzPIEF2vsf5mQFpNKarvmVfvgNuEp9tIKK/RL6K1cWN8
+TNdt1kpu3WetFj3+Nix4l1uZDdgTquuIav8VFw0CgYAIdWpCRWhCi/uKjII/phKB
+wXKc4kNxDlhYl6tDFaG7TBxSvvltC/EPXSb/Qs6D0R42MVhaLd8ZmZMM2iT4qGT4
+iYfkBxGO62Zmn81g8bo8lXLtaSpiTBG4/df8V5MWE6fJUUv7Sv8XR08huE5mSH10
+stQqiUBac5CFEaXIIV0VtwKBgQCpVCve/rEllxKkVwdzz2WrI5RHuwphDAjQBzlz
+CdJ8m+X7a5h+YOKzzG6XsDhFT+kuT4qo9yqjLmoNXxgwHxNWgzFxOZagryFm6C4w
+KjD6ksHHBZc40On8MX9Ggoh6pldo4AlhcPZsC/9S61fhInCmp7cozkd3cidi05Tq
+2BC23QKBgBPNgWrTLkJVjk/jRYKsaPIkcuRB8NcXNfP0meNJXUksiGwQRNrVU2jy
+WGVMlr1kbvyykxBp1M0gaWxtTVvyDj4hFFA8pB7GaKFysTFRR0kHbbT9AQ0c515b
+N1L4raFlpfu1l6y1JdR777n9g5pRZDfxSvGhFj0d/NUB/RJCOnSP
+-----END RSA PRIVATE KEY-----
+kang@JHankyucBookAir .ssh % ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/Users/kang/.ssh/id_rsa):  
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /Users/kang/.ssh/id_rsa
+Your public key has been saved in /Users/kang/.ssh/id_rsa.pub
+The key fingerprint is:
+SHA256:b7p7oM5nC6wl8ZeDSv4Hbdg/b4PjXC97iB+slVNblEY kang@JHankyucBookAir
+The key's randomart image is:
++---[RSA 3072]----+
+|               E |
+|              . .|
+|               o.|
+|              .. |
+|    .  +S     . .|
+|     +o.=o . o o |
+|    o *++oooB..  |
+|   o *.o+=B+=+.  |
+|    +o++=*+*+=.  |
++----[SHA256]-----+
+kang@JHankyucBookAir .ssh % ls
+id_rsa		id_rsa.pub	joshua.pem	known_hosts	known_hosts.old
+kang@JHankyucBookAir .ssh % cat id_rsa.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDpEYTNKBZi7mljdTvr02b3sKMv/wNO4hWGKL9eHWC3yNKpTMJZ+aVeoZnPKHxM3xtaljY5GWrbNsv2LJIM+WXWoMHMwc5fD6as6lBaMO8mGd1KGpdpZRv94cTHdIO18gtb8aAfgHjdlPcvudkGZbRErBAb2Gd+O/qeKNCLvmtjkqPZki8yV+1Rhc22qQKFPjdA4KMkSHAJ3PcFYB5kqggIyubK5c8YEGm06LKF7ggxh08Xif+NUgGSs+hBpOQQ0Ps7suIwRiMvofrfKJMRxLhfqy66RWH5gzzefPszMnUekJxfcX75vQufN+WgEW+mQoMbUfhNHGcFE6Guc+z3iAxvTOwcx2RaXnKNLPQV4EHgpmTIXLfaoYcBOHG7rVgfk+8IjU4HnWZIQDLNEaevJWnv3owxnY027rH+catBVX8jiFh5++6cFFbIukM4f7rLx/gY57IDyghn5tlfFuSFRPiHteKuT6EwY0WQP5OOLvUGOsBA3pTDbiIS27q8hFdq90U= kang@JHankyucBookAir
+kang@JHankyucBookAir .ssh % rm joshua.pem 
+override r-------- kang/staff for joshua.pem? yes
+kang@JHankyucBookAir .ssh % ls
+id_rsa		id_rsa.pub	known_hosts	known_hosts.old
+kang@JHankyucBookAir .ssh % ssh -i id_rsa ubuntu@199.94.60.81
+^C
+kang@JHankyucBookAir .ssh % ssh -i id_rsa ubuntu@199.94.60.81
+^C
+kang@JHankyucBookAir .ssh % ssh -i id_rsa 199.94.60.81 
+^C
+kang@JHankyucBookAir .ssh % ssh -i id_rsa 199.94.60.81
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that a host key has just been changed.
+The fingerprint for the ED25519 key sent by the remote host is
+SHA256:2haonO6wHgvJHhic8HlluZ6o/63RpgmU0oEGQnwxPlc.
+Please contact your system administrator.
+Add correct host key in /Users/kang/.ssh/known_hosts to get rid of this message.
+Offending ED25519 key in /Users/kang/.ssh/known_hosts:14
+Host key for 199.94.60.81 has changed and you have requested strict checking.
+Host key verification failed.
+kang@JHankyucBookAir .ssh % vi known_hosts 
+kang@JHankyucBookAir .ssh % ssh -i id_rsa 199.94.60.81
+The authenticity of host '199.94.60.81 (199.94.60.81)' can't be established.
+ED25519 key fingerprint is SHA256:2haonO6wHgvJHhic8HlluZ6o/63RpgmU0oEGQnwxPlc.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '199.94.60.81' (ED25519) to the list of known hosts.
+kang@199.94.60.81: Permission denied (publickey).
+kang@JHankyucBookAir .ssh % ssh -i id_rsa ubuntu@199.94.60.81
+ubuntu@199.94.60.81: Permission denied (publickey).
+kang@JHankyucBookAir .ssh % cat id_rsa                       
+-----BEGIN OPENSSH PRIVATE KEY-----
+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
+-----END OPENSSH PRIVATE KEY-----
+kang@JHankyucBookAir .ssh % cat id_rsa.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDpEYTNKBZi7mljdTvr02b3sKMv/wNO4hWGKL9eHWC3yNKpTMJZ+aVeoZnPKHxM3xtaljY5GWrbNsv2LJIM+WXWoMHMwc5fD6as6lBaMO8mGd1KGpdpZRv94cTHdIO18gtb8aAfgHjdlPcvudkGZbRErBAb2Gd+O/qeKNCLvmtjkqPZki8yV+1Rhc22qQKFPjdA4KMkSHAJ3PcFYB5kqggIyubK5c8YEGm06LKF7ggxh08Xif+NUgGSs+hBpOQQ0Ps7suIwRiMvofrfKJMRxLhfqy66RWH5gzzefPszMnUekJxfcX75vQufN+WgEW+mQoMbUfhNHGcFE6Guc+z3iAxvTOwcx2RaXnKNLPQV4EHgpmTIXLfaoYcBOHG7rVgfk+8IjU4HnWZIQDLNEaevJWnv3owxnY027rH+catBVX8jiFh5++6cFFbIukM4f7rLx/gY57IDyghn5tlfFuSFRPiHteKuT6EwY0WQP5OOLvUGOsBA3pTDbiIS27q8hFdq90U= kang@JHankyucBookAir
+kang@JHankyucBookAir .ssh % ssh -i id_rsa ubuntu@199.94.60.81
+ubuntu@199.94.60.81: Permission denied (publickey).
+kang@JHankyucBookAir .ssh % ssh -i id_rsa ubuntu@199.94.60.81
+ubuntu@199.94.60.81: Permission denied (publickey).
+kang@JHankyucBookAir .ssh % ssh ubuntu@199.94.60.81 
+ubuntu@199.94.60.81: Permission denied (publickey).
+kang@JHankyucBookAir .ssh % ls
+id_rsa		id_rsa.pub	known_hosts	known_hosts.old
+kang@JHankyucBookAir .ssh % ls -al
+total 64
+drwx------   7 kang  staff    224 Oct 25 18:35 .
+drwxr-x---+ 66 kang  staff   2112 Oct 25 18:35 ..
+-rw-------   1 kang  staff  12288 Aug  9 22:52 .swp
+-rw-------   1 kang  staff   2610 Oct 25 18:29 id_rsa
+-rw-r--r--   1 kang  staff    574 Oct 25 18:29 id_rsa.pub
+-rw-------   1 kang  staff   3604 Oct 25 18:35 known_hosts
+-rw-------   1 kang  staff   4491 Sep  8 15:38 known_hosts.old
+kang@JHankyucBookAir .ssh % ssh -i id_rsa ubuntu@199.94.60.81
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that a host key has just been changed.
+The fingerprint for the ED25519 key sent by the remote host is
+SHA256:BMiU0WEqFlxzF592cULsEOjf91V1So1E9w4mB3/PKL8.
+Please contact your system administrator.
+Add correct host key in /Users/kang/.ssh/known_hosts to get rid of this message.
+Offending ED25519 key in /Users/kang/.ssh/known_hosts:13
+Host key for 199.94.60.81 has changed and you have requested strict checking.
+Host key verification failed.
+kang@JHankyucBookAir .ssh % vi known_hosts
+kang@JHankyucBookAir .ssh % ssh -i id_rsa ubuntu@199.94.60.81
+The authenticity of host '199.94.60.81 (199.94.60.81)' can't be established.
+ED25519 key fingerprint is SHA256:BMiU0WEqFlxzF592cULsEOjf91V1So1E9w4mB3/PKL8.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '199.94.60.81' (ED25519) to the list of known hosts.
+Welcome to Ubuntu 22.04.1 LTS (GNU/Linux 5.15.0-43-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+ System information disabled due to load higher than 1.0
+
+0 updates can be applied immediately.
+
+
+The list of available updates is more than a week old.
+To check for new updates run: sudo apt update
+
+
+The programs included with the Ubuntu system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+To run a command as administrator (user "root"), use "sudo <command>".
+See "man sudo_root" for details.
+
+ubuntu@recraft:~$ git pull https://github.com/systems-research-lab/etcd.git
+fatal: not a git repository (or any of the parent directories): .git
+ubuntu@recraft:~$ git
+usage: git [--version] [--help] [-C <path>] [-c <name>=<value>]
+           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
+           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]
+           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
+           [--super-prefix=<path>] [--config-env=<name>=<envvar>]
+           <command> [<args>]
+
+These are common Git commands used in various situations:
+
+start a working area (see also: git help tutorial)
+   clone     Clone a repository into a new directory
+   init      Create an empty Git repository or reinitialize an existing one
+
+work on the current change (see also: git help everyday)
+   add       Add file contents to the index
+   mv        Move or rename a file, a directory, or a symlink
+   restore   Restore working tree files
+   rm        Remove files from the working tree and from the index
+
+examine the history and state (see also: git help revisions)
+   bisect    Use binary search to find the commit that introduced a bug
+   diff      Show changes between commits, commit and working tree, etc
+   grep      Print lines matching a pattern
+   log       Show commit logs
+   show      Show various types of objects
+   status    Show the working tree status
+
+grow, mark and tweak your common history
+   branch    List, create, or delete branches
+   commit    Record changes to the repository
+   merge     Join two or more development histories together
+   rebase    Reapply commits on top of another base tip
+   reset     Reset current HEAD to the specified state
+   switch    Switch branches
+   tag       Create, list, delete or verify a tag object signed with GPG
+
+collaborate (see also: git help workflows)
+   fetch     Download objects and refs from another repository
+   pull      Fetch from and integrate with another repository or a local branch
+   push      Update remote refs along with associated objects
+
+'git help -a' and 'git help -g' list available subcommands and some
+concept guides. See 'git help <command>' or 'git help <concept>'
+to read about a specific subcommand or concept.
+See 'git help git' for an overview of the system.
+ubuntu@recraft:~$ git clone https://github.com/systems-research-lab/etcd.git
+Cloning into 'etcd'...
+remote: Enumerating objects: 122234, done.
+remote: Counting objects: 100% (6/6), done.
+remote: Total 122234 (delta 5), reused 5 (delta 5), pack-reused 122228
+Receiving objects: 100% (122234/122234), 70.13 MiB | 32.64 MiB/s, done.
+Resolving deltas: 100% (83713/83713), done.
+ubuntu@recraft:~$ ls
+etcd
+ubuntu@recraft:~$ cd etcd 
+ubuntu@recraft:~/etcd$ go build .
+Command 'go' not found, but can be installed with:
+sudo snap install go         # version 1.21.3, or
+sudo apt  install golang-go  # version 2:1.18~0ubuntu2
+sudo apt  install gccgo-go   # version 2:1.18~0ubuntu2
+See 'snap info go' for additional versions.
+ubuntu@recraft:~/etcd$ sudo apt install golang-go
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following additional packages will be installed:
+  bzip2 cpp cpp-11 fontconfig-config fonts-dejavu-core g++ g++-11 gcc gcc-11 gcc-11-base golang-1.18-go golang-1.18-src
+  golang-src libasan6 libatomic1 libc-dev-bin libc-devtools libc6-dev libcc1-0 libcrypt-dev libdeflate0 libdpkg-perl
+  libfile-fcntllock-perl libfontconfig1 libgcc-11-dev libgd3 libgomp1 libisl23 libitm1 libjbig0 libjpeg-turbo8 libjpeg8
+  liblsan0 libmpc3 libnsl-dev libquadmath0 libstdc++-11-dev libtiff5 libtirpc-dev libtsan0 libubsan1 libwebp7 libxpm4
+  linux-libc-dev manpages-dev pkg-config rpcsvc-proto
+Suggested packages:
+  bzip2-doc cpp-doc gcc-11-locales g++-multilib g++-11-multilib gcc-11-doc gcc-multilib make autoconf automake libtool flex
+  bison gdb gcc-doc gcc-11-multilib bzr | brz mercurial subversion glibc-doc debian-keyring bzr libgd-tools libstdc++-11-doc
+  dpkg-dev
+The following NEW packages will be installed:
+  bzip2 cpp cpp-11 fontconfig-config fonts-dejavu-core g++ g++-11 gcc gcc-11 gcc-11-base golang-1.18-go golang-1.18-src
+  golang-go golang-src libasan6 libatomic1 libc-dev-bin libc-devtools libc6-dev libcc1-0 libcrypt-dev libdeflate0 libdpkg-perl
+  libfile-fcntllock-perl libfontconfig1 libgcc-11-dev libgd3 libgomp1 libisl23 libitm1 libjbig0 libjpeg-turbo8 libjpeg8
+  liblsan0 libmpc3 libnsl-dev libquadmath0 libstdc++-11-dev libtiff5 libtirpc-dev libtsan0 libubsan1 libwebp7 libxpm4
+  linux-libc-dev manpages-dev pkg-config rpcsvc-proto
+0 upgraded, 48 newly installed, 0 to remove and 0 not upgraded.
+Need to get 145 MB of archives.
+After this operation, 639 MB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 bzip2 amd64 1.0.8-5build1 [34.8 kB]
+Get:2 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 gcc-11-base amd64 11.2.0-19ubuntu1 [20.8 kB]
+Get:3 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libisl23 amd64 0.24-2build1 [727 kB]
+Get:4 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libmpc3 amd64 1.2.1-2build1 [46.9 kB]
+Get:5 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 cpp-11 amd64 11.2.0-19ubuntu1 [9966 kB]
+Get:6 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 cpp amd64 4:11.2.0-1ubuntu1 [27.7 kB]
+Get:7 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 fonts-dejavu-core all 2.37-2build1 [1041 kB]
+Get:8 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 fontconfig-config all 2.13.1-4.2ubuntu5 [29.1 kB]
+Get:9 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libcc1-0 amd64 12-20220319-1ubuntu1 [47.2 kB]
+Get:10 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libgomp1 amd64 12-20220319-1ubuntu1 [126 kB]
+Get:11 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libitm1 amd64 12-20220319-1ubuntu1 [30.2 kB]
+Get:12 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libatomic1 amd64 12-20220319-1ubuntu1 [10.4 kB]
+Get:13 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libasan6 amd64 11.2.0-19ubuntu1 [2283 kB]
+Get:14 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 liblsan0 amd64 12-20220319-1ubuntu1 [1069 kB]
+Get:15 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libtsan0 amd64 11.2.0-19ubuntu1 [2261 kB]
+Get:16 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libubsan1 amd64 12-20220319-1ubuntu1 [976 kB]
+Get:17 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libquadmath0 amd64 12-20220319-1ubuntu1 [154 kB]
+Get:18 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libgcc-11-dev amd64 11.2.0-19ubuntu1 [2526 kB]
+Get:19 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 gcc-11 amd64 11.2.0-19ubuntu1 [20.1 MB]
+Get:20 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 gcc amd64 4:11.2.0-1ubuntu1 [5112 B]
+Err:21 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc-dev-bin amd64 2.35-0ubuntu3.1
+  404  Not Found [IP: 91.189.91.122 80]
+Ign:22 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 linux-libc-dev amd64 5.15.0-43.46
+Get:23 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libcrypt-dev amd64 1:4.4.27-1 [112 kB]
+Get:24 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 rpcsvc-proto amd64 1.4.2-0ubuntu6 [68.5 kB]
+Get:25 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtirpc-dev amd64 1.3.2-2ubuntu0.1 [192 kB]
+Get:26 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libnsl-dev amd64 1.3.0-2build2 [71.3 kB]
+Err:27 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-dev amd64 2.35-0ubuntu3.1
+  404  Not Found [IP: 91.189.91.122 80]
+Get:28 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libstdc++-11-dev amd64 11.2.0-19ubuntu1 [2083 kB]
+Get:29 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 g++-11 amd64 11.2.0-19ubuntu1 [11.4 MB]
+Err:22 http://security.ubuntu.com/ubuntu jammy-updates/main amd64 linux-libc-dev amd64 5.15.0-43.46
+  404  Not Found [IP: 91.189.91.122 80]
+Get:30 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 g++ amd64 4:11.2.0-1ubuntu1 [1412 B]
+Get:31 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 golang-1.18-src all 1.18.1-1ubuntu1 [16.2 MB]
+Get:32 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 golang-1.18-go amd64 1.18.1-1ubuntu1 [66.0 MB]
+Get:33 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 golang-src all 2:1.18~0ubuntu2 [4438 B]
+Get:34 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 golang-go amd64 2:1.18~0ubuntu2 [41.8 kB]
+Get:35 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libfontconfig1 amd64 2.13.1-4.2ubuntu5 [131 kB]
+Get:36 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libjpeg-turbo8 amd64 2.1.2-0ubuntu1 [134 kB]
+Get:37 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libjpeg8 amd64 8c-2ubuntu10 [2264 B]
+Get:38 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libdeflate0 amd64 1.10-2 [70.9 kB]
+Get:39 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libjbig0 amd64 2.1-3.1build3 [28.9 kB]
+Get:40 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libwebp7 amd64 1.2.2-2 [206 kB]
+Get:41 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libtiff5 amd64 4.3.0-6 [183 kB]
+Get:42 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libxpm4 amd64 1:3.5.12-1build2 [36.2 kB]
+Get:43 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libgd3 amd64 2.3.0-2ubuntu2 [129 kB]
+Err:44 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc-devtools amd64 2.35-0ubuntu3.1
+  404  Not Found [IP: 91.189.91.122 80]
+Get:45 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libdpkg-perl all 1.21.1ubuntu2.1 [237 kB]
+Get:46 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libfile-fcntllock-perl amd64 0.22-3build7 [33.9 kB]
+Get:47 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 manpages-dev all 5.10-1ubuntu1 [2309 kB]
+Get:48 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 pkg-config amd64 0.29.2-1ubuntu3 [48.2 kB]
+Fetched 141 MB in 1s (113 MB/s)   
+E: Failed to fetch http://nova.clouds.archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc-dev-bin_2.35-0ubuntu3.1_amd64.deb  404  Not Found [IP: 91.189.91.122 80]
+E: Failed to fetch http://security.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.15.0-43.46_amd64.deb  404  Not Found [IP: 91.189.91.122 80]
+E: Failed to fetch http://nova.clouds.archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc6-dev_2.35-0ubuntu3.1_amd64.deb  404  Not Found [IP: 91.189.91.122 80]
+E: Failed to fetch http://nova.clouds.archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc-devtools_2.35-0ubuntu3.1_amd64.deb  404  Not Found [IP: 91.189.91.122 80]
+E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?
+ubuntu@recraft:~/etcd$ go build .
+Command 'go' not found, but can be installed with:
+sudo snap install go         # version 1.21.3, or
+sudo apt  install golang-go  # version 2:1.18~0ubuntu2
+sudo apt  install gccgo-go   # version 2:1.18~0ubuntu2
+See 'snap info go' for additional versions.
+ubuntu@recraft:~/etcd$ go build 
+Command 'go' not found, but can be installed with:
+sudo snap install go         # version 1.21.3, or
+sudo apt  install golang-go  # version 2:1.18~0ubuntu2
+sudo apt  install gccgo-go   # version 2:1.18~0ubuntu2
+See 'snap info go' for additional versions.
+ubuntu@recraft:~/etcd$ sudo snap install go
+error: This revision of snap "go" was published using classic confinement and thus may perform
+       arbitrary system changes outside of the security sandbox that snaps are usually confined to,
+       which may put your system at risk.
+
+       If you understand and want to proceed repeat the command including --classic.
+ubuntu@recraft:~/etcd$ sudo snap install go --classic
+go 1.21.3 from Canonical✓ installed
+ubuntu@recraft:~/etcd$ go build .
+go: downloading sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6
+go: downloading github.com/bgentry/speakeasy v0.1.0
+go: downloading github.com/cheggaaa/pb/v3 v3.1.4
+go: downloading github.com/dustin/go-humanize v1.0.1
+go: downloading github.com/olekukonko/tablewriter v0.0.5
+go: downloading github.com/spf13/cobra v1.7.0
+go: downloading github.com/spf13/pflag v1.0.5
+go: downloading go.uber.org/zap v1.26.0
+go: downloading golang.org/x/time v0.3.0
+go: downloading google.golang.org/grpc v1.58.2
+go: downloading github.com/coreos/go-semver v0.3.1
+go: downloading go.etcd.io/bbolt v1.3.7
+go: downloading go.etcd.io/raft/v3 v3.0.0-20221201111702-eaa6808e1f7a
+go: downloading github.com/VividCortex/ewma v1.2.0
+go: downloading github.com/fatih/color v1.15.0
+go: downloading github.com/mattn/go-colorable v0.1.13
+go: downloading github.com/mattn/go-isatty v0.0.19
+go: downloading github.com/mattn/go-runewidth v0.0.15
+go: downloading github.com/gogo/protobuf v1.3.2
+go: downloading github.com/golang/protobuf v1.5.3
+go: downloading github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0
+go: downloading google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d
+go: downloading google.golang.org/genproto v0.0.0-20230803162519-f966b187b2e5
+go: downloading github.com/coreos/go-systemd/v22 v22.5.0
+go: downloading golang.org/x/sys v0.12.0
+go: downloading go.uber.org/multierr v1.11.0
+go: downloading github.com/prometheus/client_golang v1.16.0
+go: downloading golang.org/x/crypto v0.13.0
+go: downloading google.golang.org/protobuf v1.31.0
+go: downloading github.com/stretchr/testify v1.8.4
+go: downloading github.com/google/go-cmp v0.5.9
+go: downloading github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
+go: downloading github.com/soheilhy/cmux v0.1.5
+go: downloading go.etcd.io/gofail v0.1.0
+go: downloading github.com/rivo/uniseg v0.2.0
+go: downloading golang.org/x/net v0.15.0
+go: downloading google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d
+go: downloading go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.44.0
+go: downloading github.com/google/btree v1.1.2
+go: downloading github.com/beorn7/perks v1.0.1
+go: downloading github.com/cespare/xxhash/v2 v2.2.0
+go: downloading github.com/prometheus/client_model v0.4.0
+go: downloading github.com/prometheus/common v0.43.0
+go: downloading github.com/prometheus/procfs v0.10.1
+go: downloading github.com/golang-jwt/jwt/v4 v4.5.0
+go: downloading github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
+go: downloading github.com/jonboulle/clockwork v0.4.0
+go: downloading github.com/davecgh/go-spew v1.1.1
+go: downloading github.com/pmezard/go-difflib v1.0.0
+go: downloading gopkg.in/yaml.v3 v3.0.1
+go: downloading github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
+go: downloading github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802
+go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.18.0
+go: downloading go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.18.0
+go: downloading go.opentelemetry.io/otel v1.18.0
+go: downloading go.opentelemetry.io/otel/sdk v1.18.0
+go: downloading gopkg.in/natefinch/lumberjack.v2 v2.2.1
+go: downloading sigs.k8s.io/yaml v1.3.0
+go: downloading go.opentelemetry.io/otel/metric v1.18.0
+go: downloading go.opentelemetry.io/otel/trace v1.18.0
+go: downloading github.com/matttproud/golang_protobuf_extensions v1.0.4
+go: downloading github.com/gorilla/websocket v1.4.2
+go: downloading github.com/sirupsen/logrus v1.8.1
+go: downloading go.opentelemetry.io/proto/otlp v1.0.0
+go: downloading gopkg.in/yaml.v2 v2.4.0
+go: downloading github.com/go-logr/logr v1.2.4
+go: downloading golang.org/x/text v0.13.0
+go: downloading github.com/cenkalti/backoff/v4 v4.2.1
+go: downloading github.com/go-logr/stdr v1.2.2
+ubuntu@recraft:~/etcd$ ls
+ADOPTERS.md      GOVERNANCE.md  README.md                        codecov.yml           go.mod   security
+CHANGELOG        LICENSE        api                              contrib               go.sum   server
+CONTRIBUTING.md  MAINTAINERS    bill-of-materials.json           dummy.go              hack     tests
+DCO              Makefile       bill-of-materials.override.json  etcd.conf.yml.sample  logos    tools
+Dockerfile       OWNERS         client                           etcdctl               pkg
+Documentation    Procfile       code-of-conduct.md               etcdutl               scripts
+ubuntu@recraft:~/etcd$ git checkout rcAdd-1
+error: pathspec 'rcAdd-1' did not match any file(s) known to git
+ubuntu@recraft:~/etcd$ git checkout rcAdd_1
+Branch 'rcAdd_1' set up to track remote branch 'rcAdd_1' from 'origin'.
+Switched to a new branch 'rcAdd_1'
+ubuntu@recraft:~/etcd$ cd deploy
+ubuntu@recraft:~/etcd/deploy$ ls
+fabfile.py
+ubuntu@recraft:~/etcd/deploy$ cd ..
+ubuntu@recraft:~/etcd$ cd evaluation/
+ubuntu@recraft:~/etcd/evaluation$ ls
+main  multi-client
+ubuntu@recraft:~/etcd/evaluation$ ls ..
+CONTRIBUTING.md             LICENSE           api                              code-of-conduct.md    evaluation  security
+DCO                         MAINTAINERS       bill-of-materials.json           codecov.yml           go.mod      server
+Dockerfile-release.amd64    Makefile          bill-of-materials.override.json  contrib               go.sum      test
+Dockerfile-release.arm64    Procfile          build                            deploy                hack        test.sh
+Dockerfile-release.ppc64le  Procfile.learner  build.bat                        dummy.go              logos       tests
+Dockerfile-release.s390x    Procfile.v2       build.ps1                        etcd.conf.yml.sample  pkg         tools
+Documentation               README.md         build.sh                         etcdctl               raft
+GOVERNANCE.md               ROADMAP.md        client                           etcdutl               scripts
+ubuntu@recraft:~/etcd/evaluation$ cd ..
+ubuntu@recraft:~/etcd$ cd deploy
+ubuntu@recraft:~/etcd/deploy$ fab start 
+Command 'fab' not found, but can be installed with:
+sudo apt install fabric
+ubuntu@recraft:~/etcd/deploy$ sudo apt install fabric
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+E: Unable to locate package fabric
+ubuntu@recraft:~/etcd/deploy$ pip fabric
+Command 'pip' not found, but can be installed with:
+sudo apt install python3-pip
+ubuntu@recraft:~/etcd/deploy$ sudo apt install python3-pip
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Package python3-pip is not available, but is referred to by another package.
+This may mean that the package is missing, has been obsoleted, or
+is only available from another source
+
+E: Package 'python3-pip' has no installation candidate
+ubuntu@recraft:~/etcd/deploy$ sudo apt install
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+ubuntu@recraft:~/etcd/deploy$ sudo apt install fabric
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+E: Unable to locate package fabric
+ubuntu@recraft:~/etcd/deploy$ python
+Command 'python' not found, did you mean:
+  command 'python3' from deb python3
+  command 'python' from deb python-is-python3
+ubuntu@recraft:~/etcd/deploy$ cd ..
+ubuntu@recraft:~/etcd$ cd ..
+ubuntu@recraft:~$ sudo apt install fabrci
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+E: Unable to locate package fabrci
+ubuntu@recraft:~$ sudo apt install fabric
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+E: Unable to locate package fabric
+ubuntu@recraft:~$ sudo apt install fab
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+E: Unable to locate package fab
+ubuntu@recraft:~$ sudo apt-get install fabric
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+E: Unable to locate package fabric
+ubuntu@recraft:~$ 
