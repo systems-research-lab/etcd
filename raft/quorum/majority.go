@@ -218,6 +218,15 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 		//len(c)/2 + 1 = Q0 = old quorum size
 		//q = (len(c)-1)/2 + add  - len(c)/2 + 1 + 1
 
+		//for ADD:
+		//Nold = len(c)
+		//Nnew = Nold + n = len(c) + add
+		//Q = len(c) + add - q + 1
+		//resize to Q = (len(c) + add)/2 + 1
+
+		//for REMOVE:
+		//Q = len(c) - q + 1
+
 		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
 	} else {
 		q = int(quorum)
