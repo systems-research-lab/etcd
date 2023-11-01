@@ -101,11 +101,11 @@ func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker
 	for id := range incoming(cfg.Voters) {
 		outgoing(cfg.Voters)[id] = struct{}{}
 	}
-	zap.Uint64("quorum old", cfg.Quorum)
+	zap.Uint64("raft/confchange.go/EnterJoint(): quorum old", cfg.Quorum)
 	if err := c.apply(&cfg, prs, ccs...); err != nil {
 		return c.err(err)
 	}
-	zap.Uint64("quorum new", cfg.Quorum)
+	zap.Uint64("raft/confchange.go/EnterJoint(): quorum new", cfg.Quorum)
 	return checkAndReturn(cfg, prs)
 }
 

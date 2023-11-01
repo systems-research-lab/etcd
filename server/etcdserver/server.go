@@ -1168,6 +1168,7 @@ func (s *EtcdServer) run() {
 	for {
 		select {
 		case ap := <-s.r.apply():
+			s.lg.Debug("conf change from RAFT apply channel to SERVER to be applied")
 			f := func(context.Context) { s.applyAll(&ep, &ap) }
 			sched.Schedule(f)
 		case leases := <-expiredLeaseC:
@@ -1569,7 +1570,7 @@ func (s *EtcdServer) applyConfChangeV1(entry raftpb.Entry) (shouldStop bool) {
 	return
 }
 
-/*func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
+func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 	var cc raftpb.ConfChangeV2
 	pbutil.MustUnmarshal(&cc, entry.Data)
 	cc.ConfTerm = entry.Term
@@ -1681,149 +1682,7 @@ func (s *EtcdServer) applyConfChangeV1(entry raftpb.Entry) (shouldStop bool) {
 				if err := gob.NewDecoder(bytes.NewBuffer(change.Context)).Decode(&mem); err != nil {
 					s.Logger().Panic("failed to unmarshal member", zap.Error(err))
 				}
-
-				s.cluster.AddMember(&membership.Member{
-					ID: mem.ID,
-					RaftAttributes: membership.RaftAttributes{
-						PeerURLs:  mem.PeerURLs,
-						IsLearner: false,
-					},
-					Attributes: membership.Attributes{
-						Name:       mem.Name,
-						ClientURLs: mem.ClientURLs,
-					},
-				}, membership.ApplyBoth)
-
-				s.r.transport.AddPeer(mem.ID, mem.PeerURLs)
-			}
-		}
-
-		triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
-		if err != nil {
-			s.lg.Panic("parse conf change id failed", zap.Error(err))
-		}
-		if s.w.IsRegistered(triggerId) {
-			s.w.Trigger(triggerId, &confChangeResponse{s.cluster.Members(), nil})
-		}
-	}
-
-	s.appliedConfEntry[ccid] = struct{}{}
-	return
-}*/
-
-func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
-	var cc raftpb.ConfChangeV2
-	pbutil.MustUnmarshal(&cc, entry.Data)
-	cc.ConfTerm = entry.Term
-	cc.ConfIndex = entry.Index
-
-	if cc.Transition != raftpb.ConfChangeTransitionJointImplicit &&
-		cc.Transition != raftpb.ConfChangeTransitionJointLeave &&
-		cc.Transition != raftpb.ConfChangeTransitionSplitImplicit &&
-		cc.Transition != raftpb.ConfChangeTransitionSplitExplicit &&
-		cc.Transition != raftpb.ConfChangeTransitionSplitLeave &&
-		cc.Transition != raftpb.ConfChangeTransitionMergeLeave {
-		s.lg.Warn("unsupported conf change v1 type", zap.Stringer("type", entry.Type))
-		return
-	}
-
-	confState := s.r.raftNodeConfig.raftStorage.GetCurrentConfState().ConfState
-	ccid := confChangeEntryIdentifier(entry)
-	if _, ok := s.appliedConfEntry[ccid]; ok {
-		s.lg.Debug("conf change v2 entry committed", zap.String("conf-change-entry-identifier", ccid))
-
-		// when committed joint leave, member should already be removed from raft,
-		// now delete member from etcd cluster and transport
-		switch cc.Transition {
-		case raftpb.ConfChangeTransitionMergeLeave:
-			s.w.Trigger(mergeId, nil)
-
-		case raftpb.ConfChangeTransitionSplitImplicit:
-			splitEnterIdx = entry.Index
-
-		case raftpb.ConfChangeTransitionSplitExplicit:
-			splitEnterIdx = entry.Index
-
-		case raftpb.ConfChangeTransitionSplitLeave:
-			s.w.Trigger(splitId, nil)
-
-			jointEntries, err := s.r.raftStorage.Entries(splitEnterIdx+1, entry.Index+1, math.MaxUint64)
-			if err != nil {
-				s.lg.Panic("retrieve split joint entries failed",
-					zap.Error(err),
-					zap.Uint64("splitEnterIdx", splitEnterIdx),
-					zap.Uint64("splitLeaveIdx", entry.Index))
-			}
-			s.r.raftStorage.PutSplitJointEntries(entry.Epoch, jointEntries)
-
-			if err = s.r.storage.SavePreserveLogs(jointEntries); err != nil {
-				s.lg.Panic("persist split joint entries failed", zap.Error(err))
-			}
-
-		case raftpb.ConfChangeTransitionJointLeave:
-			for _, change := range cc.Changes {
-				id := types.ID(change.NodeID)
-				if change.Type == raftpb.ConfChangeRemoveNode {
-					s.lg.Info("leave entry committed, remove node", zap.Uint64("id", change.NodeID))
-					if !s.cluster.IsMemberExist(id) {
-						panic("remove member not exist: " + id.String())
-					}
-					s.cluster.RemoveMember(id, membership.ApplyBoth)
-
-					if s.id == id {
-						shouldStop = true
-					} else {
-						s.r.transport.Send([]raftpb.Message{{From: uint64(s.cluster.ID()), To: uint64(id), Type: raftpb.MsgShutdown}})
-						s.r.transport.RemovePeer(id)
-					}
-				}
-			}
-
-			triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
-			if err != nil {
-				s.lg.Panic("parse conf change id failed", zap.Error(err))
-			}
-			if s.w.IsRegistered(triggerId) {
-				s.w.Trigger(triggerId, &confChangeResponse{s.cluster.Members(), nil})
-			}
-		}
-
-		s.r.raftNodeConfig.raftStorage.AppendConf(confState)
-		if err := s.r.storage.SaveConfHistory(confState); err != nil {
-			s.lg.Panic("persist conf state failed",
-				zap.Error(err),
-				zap.Stringer("confState", &confState))
-		}
-
-		return
-	}
-
-	s.lg.Debug("conf change v2 entry appended", zap.String("conf-change-entry-identifier", ccid))
-
-	confState = *s.r.ApplyConfChange(cc)
-	switch cc.Transition {
-	case raftpb.ConfChangeTransitionSplitLeave:
-		if len(confState.VotersOutgoing) != 0 {
-			panic("Should already left joint consensus! ConfState: " + confState.String())
-		}
-	case raftpb.ConfChangeTransitionSplitExplicit:
-		splitEnterIdx = entry.Index
-
-	case raftpb.ConfChangeTransitionJointImplicit:
-		splitEnterIdx = entry.Index
-
-		if len(confState.VotersOutgoing) == 0 {
-			panic("Not in joint consensus! ConfState: " + confState.String())
-		}
-
-		s.Logger().Debug("apply enter ReCraft conf change")
-		for _, change := range cc.Changes {
-			if change.Type == raftpb.ConfChangeAddNode {
-				var mem membership.Member
-				if err := gob.NewDecoder(bytes.NewBuffer(change.Context)).Decode(&mem); err != nil {
-					s.Logger().Panic("failed to unmarshal member", zap.Error(err))
-				}
-
+				s.Logger().Debug("server.go/applyConfChangeV2(): joint conf change APPLY add member to cluster")
 				s.cluster.AddMember(&membership.Member{
 					ID: mem.ID,
 					RaftAttributes: membership.RaftAttributes{
@@ -2223,6 +2082,7 @@ func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) (
 
 func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error) {
 	changes := make([]raftpb.ConfChangeSingle, 0, len(addMembs)+len(removeMembs))
+	s.lg.Debug("server.go/JointMember(): begin joint add conf change")
 	for _, mem := range addMembs {
 		if s.cluster.IsMemberExist(mem.ID) {
 			return nil, fmt.Errorf("add existed member: %s", mem.ID)
@@ -2262,7 +2122,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 	}
 
 	start := time.Now()
-	s.lg.Debug("propose joint conf change")
+	s.lg.Debug("server.go/JointMember(): PROPOSE joint conf change through RAFT")
 	if err := s.r.ProposeConfChange(ctx, cc); err != nil {
 		s.w.Trigger(id, nil)
 		return nil, err
@@ -2275,6 +2135,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 			lg.Panic("failed to configure")
 		}
 		resp := x.(*confChangeResponse)
+		s.lg.Debug("server.go/JointMember(): joint conf change applied through RAFT")
 		lg.Info(
 			"applied a joint configuration change through raft",
 			zap.String("local-member-id", s.ID().String()),
