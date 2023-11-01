@@ -1168,6 +1168,7 @@ func (s *EtcdServer) run() {
 	for {
 		select {
 		case ap := <-s.r.apply():
+			s.lg.Debug("PROBE: conf change from RAFT apply channel to SERVER to be applied")
 			f := func(context.Context) { s.applyAll(&ep, &ap) }
 			sched.Schedule(f)
 		case leases := <-expiredLeaseC:
