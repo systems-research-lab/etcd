@@ -1168,7 +1168,7 @@ func (s *EtcdServer) run() {
 	for {
 		select {
 		case ap := <-s.r.apply():
-			s.lg.Debug("conf change from RAFT apply channel to SERVER to be applied")
+			s.lg.Debug("PROBE: conf change from RAFT apply channel to SERVER to be applied")
 			f := func(context.Context) { s.applyAll(&ep, &ap) }
 			sched.Schedule(f)
 		case leases := <-expiredLeaseC:
@@ -2135,7 +2135,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 			lg.Panic("failed to configure")
 		}
 		resp := x.(*confChangeResponse)
-		s.lg.Debug("server.go/JointMember(): joint conf change applied through RAFT")
+		s.lg.Debug("PROBE server.go/JointMember(): joint conf change applied through RAFT")
 		lg.Info(
 			"applied a joint configuration change through raft",
 			zap.String("local-member-id", s.ID().String()),
