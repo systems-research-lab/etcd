@@ -16,6 +16,7 @@ package quorum
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"strings"
@@ -228,11 +229,13 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 		//Q = len(c) - q + 1
 
 		fmt.Sprintf("PROBE: majoirty.go/voteresult(): quorum votesresult %[1]d\n", q)
+		log.Println("PROBE: majoirty.go/voteresult()1: quorum value", q)
 	} else {
 		q = int(quorum)
 		fmt.Sprintf("PROBE: majoirty.go/voteresult(): variable quorum votesresult %[1]d\n", q)
+		log.Println("PROBE: majoirty.go/voteresult()2 : quorum value", q)
 	}
-	fmt.Sprintf("PROBE: majoirty.go/voteresult(): quorum value %[1]d\n", q)
+	log.Println("PROBE: majoirty.go/voteresult() 3: quorum value", q)
 	if ny[1] >= q {
 		return VoteWon
 	}
