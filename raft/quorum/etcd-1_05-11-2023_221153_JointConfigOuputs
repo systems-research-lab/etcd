@@ -2094,8 +2094,7 @@ c15","to":"835b8fb4f87896a0","address":"http://127.0.0.1:6380/raft/stream/msgapp
 {"level":"info","ts":"2023-11-05T22:10:58.560-0500","logger":"raft","caller":"etcdserver/zap_raft.go:77","msg":"83a306fc978aac15 is starting a new election at term 5"}
 {"level":"info","ts":"2023-11-05T22:10:58.560-0500","logger":"raft","caller":"etcdserver/zap_raft.go:77","msg":"83a306fc978aac15 became candidate at term 6"}
 {"level":"info","ts":"2023-11-05T22:10:58.560-0500","logger":"raft","caller":"etcdserver/zap_raft.go:77","msg":"83a306fc978aac15 received MsgVoteResp from 83a306fc978aac15 at term 6"}
-2023/11/05 22:10:58 raft/quorum/joint.go: joint config
-2023/11/05 22:10:58 (7905197988486086812 8938357745929296221 9465317049274767008 9485432922116369429 17060213564139361052)&&(7905197988486086812 8938357745929296221 9485432922116369429)&&()&&()&&()&&()
+
 2023/11/05 22:10:58 PROBE: majoirty.go/voteresult()1: quorum value 3
 2023/11/05 22:10:58 PROBE: majoirty.go/voteresult() 3: quorum value 3
 2023/11/05 22:10:58 PROBE: majoirty.go/voteresult()1: quorum value 2
