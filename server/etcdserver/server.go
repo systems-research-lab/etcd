@@ -1168,7 +1168,7 @@ func (s *EtcdServer) run() {
 	for {
 		select {
 		case ap := <-s.r.apply():
-			s.lg.Debug("PROBE: conf change from RAFT apply channel to SERVER to be applied")
+			//	s.lg.Debug("PROBE: conf change from RAFT apply channel to SERVER to be applied")
 			f := func(context.Context) { s.applyAll(&ep, &ap) }
 			sched.Schedule(f)
 		case leases := <-expiredLeaseC:
@@ -2114,6 +2114,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 	id := s.reqIDGen.Next()
 	ch := s.w.Register(id)
 
+	//leave joint set to implicit which triggers automatic transition
 	cc := raftpb.ConfChangeV2{
 		Transition: raftpb.ConfChangeTransitionJointImplicit,
 		Changes:    changes,
