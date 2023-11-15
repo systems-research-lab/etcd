@@ -78,7 +78,14 @@ func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteResult
 	//difference between two joint configs to determine new member count
 	if len(c[1]) > 0 {
 		quorum = uint64(len(c[0]) - len(c[1]))
+		log.Println("raft/quorum/joint.go: c[1] quorum ", quorum)
 	}
+	if len(c[1]) == 0 {
+		//	var q = -1
+		quorum = 0
+		log.Println("raft/quorum/joint.go: c[1] == 0 quorum ", quorum)
+	}
+
 	for _, mc := range c {
 		log.Println("raft/quorum/joint.go: VOTING config")
 		log.Println(mc)
