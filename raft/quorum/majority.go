@@ -209,8 +209,10 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 	}
 	var q int
 	//q = 3 //hard coded value for testing
+	var n = int(quorum)
+	quorum = 0
 	if quorum == 0 {
-		q = len(c)/2 + 1 //this may not fully implement Shrieen's quorum formula. this appears to be majority quorum value only.
+		//q = len(c)/2 + 1 //this may not fully implement Shrieen's quorum formula. this appears to be majority quorum value only.
 
 		//calculation from Shireens report
 		//len(c) = n = number of nodes
@@ -228,6 +230,12 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 		//for REMOVE:
 		//Q = len(c) - q + 1
 
+		//Test: Qnew−q = Nold + n − Qold + 1
+		var Qold = len(c)/2 + 1
+		var Nold = len(c)
+		q = Nold + n - Qold + 1
+		log.Println("PROBE: majoirty.go/voteresult()1: Formula n, new members", n)
+		log.Println("PROBE: majoirty.go/voteresult()1: len(c)", Nold)
 		fmt.Sprintf("PROBE: majoirty.go/voteresult(): quorum votesresult %[1]d\n", q)
 		log.Println("PROBE: majoirty.go/voteresult()1: quorum value", q)
 	} else {

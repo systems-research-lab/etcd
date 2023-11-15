@@ -74,7 +74,14 @@ func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteResult
 	//injection here of q value
 	log.Println("raft/quorum/joint.go: joint config")
 	log.Println(c)
+
+	//difference between two joint configs to determine new member count
+	if len(c[1]) > 0 {
+		quorum = uint64(len(c[0]) - len(c[1]))
+	}
 	for _, mc := range c {
+		log.Println("raft/quorum/joint.go: VOTING config")
+		log.Println(mc)
 		r := mc.VoteResult(votes, quorum)
 		if r == VoteLost {
 			return VoteLost
