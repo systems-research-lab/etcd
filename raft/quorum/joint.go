@@ -14,7 +14,10 @@
 
 package quorum
 
-import "math"
+import (
+	"log"
+	"math"
+)
 
 // JointConfig is a configuration of two groups of (possibly overlapping)
 // majority configurations. Decisions require the support of both majorities.
@@ -69,9 +72,10 @@ func (c JointConfig) CommittedIndex(l AckedIndexer, quorum uint64) Index {
 func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteResult {
 	ret := VoteWon
 	if len(c[1]) > 0 {
+		log.Print("raft/joint.go: setting quorum")
 		quorum = uint64(len(c[0]) - len(c[1]))
 	}
-
+	log.Print("raft/joint.go: joint config: ", c)
 	for _, mc := range c {
 		r := mc.VoteResult(votes, quorum)
 		if r == VoteLost {
