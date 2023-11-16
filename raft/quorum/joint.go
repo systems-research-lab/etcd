@@ -85,16 +85,13 @@ func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteResult
 		quorum = 0
 		log.Println("raft/quorum/joint.go: c[1] == 0 quorum ", quorum)
 	}
-
-	for _, mc := range c {
-		log.Println("raft/quorum/joint.go: VOTING config")
-		log.Println(mc)
-		r := mc.VoteResult(votes, quorum)
-		if r == VoteLost {
-			return VoteLost
-		} else if r == VotePending {
-			ret = r
-		}
+	log.Println("raft/quorum/joint.go: VOTING config")
+	log.Println(c[0])
+	r := c[0].VoteResult(votes, quorum)
+	if r == VoteLost {
+		return VoteLost
+	} else if r == VotePending {
+		ret = r
 	}
 	return ret
 }
