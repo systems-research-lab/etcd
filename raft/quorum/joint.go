@@ -71,27 +71,18 @@ func (c JointConfig) CommittedIndex(l AckedIndexer, quorum uint64) Index {
 // requires both majority quorums to vote in favor.
 func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteResult {
 	ret := VoteWon
-	//injection here of q value
-	log.Println("raft/quorum/joint.go: joint config")
-	log.Println(c)
-
-	//difference between two joint configs to determine new member count
 	if len(c[1]) > 0 {
+		log.Print("raft/joint.go: setting quorum")
 		quorum = uint64(len(c[0]) - len(c[1]))
-		log.Println("raft/quorum/joint.go: c[1] quorum ", quorum)
 	}
-	if len(c[1]) == 0 {
-		//	var q = -1
-		quorum = 0
-		log.Println("raft/quorum/joint.go: c[1] == 0 quorum ", quorum)
-	}
-	log.Println("raft/quorum/joint.go: VOTING config")
-	log.Println(c[0])
-	r := c[0].VoteResult(votes, quorum)
-	if r == VoteLost {
-		return VoteLost
-	} else if r == VotePending {
-		ret = r
+	log.Print("raft/joint.go: joint config: ", c)
+	for _, mc := range c {
+		r := mc.VoteResult(votes, quorum)
+		if r == VoteLost {
+			return VoteLost
+		} else if r == VotePending {
+			ret = r
+		}
 	}
 	return ret
 }

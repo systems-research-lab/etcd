@@ -208,45 +208,16 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 		}
 	}
 	var q int
-	//q = 3 //hard coded value for testing
 	var n = int(quorum)
-	//quorum = 0
-	log.Print("PROBE: majoirty.go/voteresult(): quorum", quorum)
 	if quorum > 0 {
-		//q = len(c)/2 + 1 //this may not fully implement Shrieen's quorum formula. this appears to be majority quorum value only.
-
-		//calculation from Shireens report
-		//len(c) = n = number of nodes
-		//failed nodes = (len(c)-2)/2 = f from shireens report
-		//add = need to pass in  the number of nodes to be added
-		//len(c)/2 + 1 = Q0 = old quorum size
-		//q = (len(c)-1)/2 + add  - len(c)/2 + 1 + 1
-
-		//for ADD:
-		//Nold = len(c)
-		//Nnew = Nold + n = len(c) + add
-		//Q = len(c) + add - q + 1
-		//resize to Q = (len(c) + add)/2 + 1
-
-		//for REMOVE:
-		//Q = len(c) - q + 1
-
-		//Test: Qnew−q = Nold + n − Qold + 1
 		var Qold = len(c)/2 + 1
 		var Nold = len(c)
 		q = Nold + n - Qold + 1
-		log.Println("PROBE: majoirty.go/voteresult()1: Formula n, new members", n)
-		log.Println("PROBE: majoirty.go/voteresult()1: len(c)", Nold)
-		fmt.Sprintf("PROBE: majoirty.go/voteresult(): quorum votesresult %[1]d\n", q)
-		log.Println("PROBE: majoirty.go/voteresult()1: quorum value", q)
+		log.Printf("variable quorum votesresult %[1]d\n", q)
 	} else {
-
 		q = len(c)/2 + 1
-		log.Println("PROBE: majoirty.go/voteresult()2 : reverting to majority quorum value", q)
-		fmt.Sprintf("PROBE: majoirty.go/voteresult(): reverting to majority quorum %[1]d\n", q)
-
+		log.Printf("majority quorum votesresult %[1]d\n", q)
 	}
-	log.Println("PROBE: majoirty.go/voteresult() 3: quorum value", q)
 	if ny[1] >= q {
 		return VoteWon
 	}
