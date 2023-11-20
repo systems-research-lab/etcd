@@ -1682,7 +1682,7 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 				if err := gob.NewDecoder(bytes.NewBuffer(change.Context)).Decode(&mem); err != nil {
 					s.Logger().Panic("failed to unmarshal member", zap.Error(err))
 				}
-				s.Logger().Debug("server.go/applyConfChangeV2(): joint conf change APPLY add member to cluster")
+
 				s.cluster.AddMember(&membership.Member{
 					ID: mem.ID,
 					RaftAttributes: membership.RaftAttributes{
@@ -2082,7 +2082,6 @@ func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) (
 
 func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error) {
 	changes := make([]raftpb.ConfChangeSingle, 0, len(addMembs)+len(removeMembs))
-	s.lg.Debug("server.go/JointMember(): begin joint add conf change")
 	for _, mem := range addMembs {
 		if s.cluster.IsMemberExist(mem.ID) {
 			return nil, fmt.Errorf("add existed member: %s", mem.ID)
@@ -2122,7 +2121,6 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 	}
 
 	start := time.Now()
-	s.lg.Debug("server.go/JointMember(): PROPOSE joint conf change through RAFT")
 	if err := s.r.ProposeConfChange(ctx, cc); err != nil {
 		s.w.Trigger(id, nil)
 		return nil, err
@@ -2135,7 +2133,6 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 			lg.Panic("failed to configure")
 		}
 		resp := x.(*confChangeResponse)
-		s.lg.Debug("PROBE server.go/JointMember(): joint conf change applied through RAFT")
 		lg.Info(
 			"applied a joint configuration change through raft",
 			zap.String("local-member-id", s.ID().String()),

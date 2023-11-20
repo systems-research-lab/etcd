@@ -17,7 +17,6 @@ package confchange
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -81,7 +80,6 @@ type Changer struct {
 }*/
 
 func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.ProgressMap, error) {
-	log.Println("raft/confchange.go/ config to enter joint")
 	cfg, prs, err := c.checkAndCopy()
 	if err != nil {
 		return c.err(err)
@@ -102,11 +100,9 @@ func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker
 	for id := range incoming(cfg.Voters) {
 		outgoing(cfg.Voters)[id] = struct{}{}
 	}
-	log.Println("raft/confchange.go/EnterJoint(): quorum old", cfg.Quorum)
 	if err := c.apply(&cfg, prs, ccs...); err != nil {
 		return c.err(err)
 	}
-	log.Println("raft/confchange.go/EnterJoint(): quorum new", cfg.Quorum)
 	return checkAndReturn(cfg, prs)
 }
 
