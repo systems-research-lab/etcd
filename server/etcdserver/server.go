@@ -2115,7 +2115,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 	ch := s.w.Register(id)
 
 	cc := raftpb.ConfChangeV2{
-		Transition: raftpb.ConfChangeTransitionJointImplicit,
+		Transition: raftpb.ConfChangeTransitionJointImplicit, //autoleave
 		Changes:    changes,
 		Context:    []byte(strconv.FormatUint(id, 10)),
 	}
