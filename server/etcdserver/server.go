@@ -2128,7 +2128,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 
 	id = s.reqIDGen.Next()
 	ch = s.w.Register(id)
-
+	time.Sleep(60000)
 	cc = raftpb.ConfChangeV2{
 		Transition: raftpb.ConfChangeTransitionJointLeave,
 	}
