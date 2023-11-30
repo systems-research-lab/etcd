@@ -92,6 +92,7 @@ func (c ConfChangeV2) EnterJoint() (autoLeave bool, ok bool) {
 		case ConfChangeTransitionJointImplicit:
 			autoLeave = true
 		case ConfChangeTransitionJointExplicit:
+			autoLeave = false
 		default:
 			panic(fmt.Sprintf("unknown transition: %+v", c))
 		}

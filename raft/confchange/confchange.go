@@ -104,7 +104,6 @@ func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker
 		return c.err(err)
 	}
 	//cfg.AutoLeave = autoLeave
-	c.LeaveJoint()
 	return checkAndReturn(cfg, prs)
 }
 
