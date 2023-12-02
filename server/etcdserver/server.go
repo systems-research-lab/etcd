@@ -2126,16 +2126,6 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 		return nil, err
 	}
 
-	id = s.reqIDGen.Next()
-	ch = s.w.Register(id)
-	time.Sleep(60000)
-	cc = raftpb.ConfChangeV2{
-		Transition: raftpb.ConfChangeTransitionJointLeave,
-	}
-	if err := s.r.ProposeConfChange(ctx, cc); err != nil {
-		s.w.Trigger(id, nil)
-		return nil, err
-	}
 	lg := s.Logger()
 	select {
 	case x := <-ch:

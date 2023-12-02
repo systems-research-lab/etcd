@@ -219,10 +219,14 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 		log.Printf("majority quorum votesresult %[1]d\n", q)
 	}
 	if ny[1] >= q {
+		log.Printf("WON %[1]d\n", q)
 		return VoteWon
 	}
 	if ny[1]+missing >= q {
+		log.Printf("PENDING %[1]d\n", q)
+		log.Printf("MISSING %[1]d\n", missing)
 		return VotePending
 	}
+	log.Printf("LOST %[1]d\n", q)
 	return VoteLost
 }
