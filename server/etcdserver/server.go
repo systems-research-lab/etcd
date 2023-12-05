@@ -22,6 +22,7 @@ import (
 	"expvar"
 	"fmt"
 	"go.etcd.io/etcd/pkg/v3/measure"
+	"log"
 	"math"
 	"math/rand"
 	"net/http"
@@ -1575,7 +1576,7 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 	pbutil.MustUnmarshal(&cc, entry.Data)
 	cc.ConfTerm = entry.Term
 	cc.ConfIndex = entry.Index
-
+	log.Print("cc.Context: ", string(cc.Context))
 	if cc.Transition != raftpb.ConfChangeTransitionJointImplicit &&
 		cc.Transition != raftpb.ConfChangeTransitionJointLeave &&
 		cc.Transition != raftpb.ConfChangeTransitionSplitImplicit &&
@@ -1637,7 +1638,7 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 					}
 				}
 			}
-
+			log.Print("cc.Context: ", string(cc.Context))
 			triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
 			if err != nil {
 				s.lg.Panic("parse conf change id failed", zap.Error(err))
@@ -2007,7 +2008,11 @@ func (s *EtcdServer) PromoteMember(ctx context.Context, id uint64) ([]*membershi
 
 func (s *EtcdServer) SplitMember(ctx context.Context, clusters []pb.MemberList, explictLeave, leave bool) ([]membership.Member, error) {
 	if leave { // leave joint consensus for split
-		if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{Transition: raftpb.ConfChangeTransitionJointLeave}); err != nil {
+		id := s.reqIDGen.Next()
+		if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{
+			Context:    []byte(strconv.FormatUint(id, 10)),
+			Transition: raftpb.ConfChangeTransitionJointLeave}); err != nil {
+			//s.w.Trigger(id, nil)
 			return nil, err
 		}
 
