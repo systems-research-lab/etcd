@@ -2007,10 +2007,11 @@ func (s *EtcdServer) PromoteMember(ctx context.Context, id uint64) ([]*membershi
 
 func (s *EtcdServer) SplitMember(ctx context.Context, clusters []pb.MemberList, explictLeave, leave bool) ([]membership.Member, error) {
 	if leave { // leave joint consensus for split
-		if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{Transition: raftpb.ConfChangeTransitionSplitLeave}); err != nil {
+		if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{Transition: raftpb.ConfChangeTransitionJointLeave}); err != nil {
 			return nil, err
 		}
-	} else { // enter joint consensus for split
+
+	} /*else { // enter joint consensus for split
 		changes := make([]raftpb.ConfChangeSingle, 0)
 		for idx, clr := range clusters {
 			for _, mem := range clr.Members {
@@ -2054,7 +2055,7 @@ func (s *EtcdServer) SplitMember(ctx context.Context, clusters []pb.MemberList, 
 				return nil, ErrStopped
 			}
 		}
-	}
+	}*/
 
 	return nil, nil
 }
@@ -2117,8 +2118,10 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 	//leave joint set to implicit which triggers automatic transition
 	cc := raftpb.ConfChangeV2{
 		Transition: raftpb.ConfChangeTransitionJointImplicit,
-		Changes:    changes,
-		Context:    []byte(strconv.FormatUint(id, 10)),
+		//when set to explicit fails
+		//when set to implicit, can still send new request
+		Changes: changes,
+		Context: []byte(strconv.FormatUint(id, 10)),
 	}
 
 	start := time.Now()
@@ -2127,6 +2130,8 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 		s.w.Trigger(id, nil)
 		return nil, err
 	}
+
+	/*time.Sleep(10000)
 	id = s.reqIDGen.Next()
 	ch = s.w.Register(id)
 
@@ -2136,7 +2141,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 	if err := s.r.ProposeConfChange(ctx, cc); err != nil {
 		s.w.Trigger(id, nil)
 		return nil, err
-	}
+	}*/
 	lg := s.Logger()
 	select {
 	case x := <-ch:
