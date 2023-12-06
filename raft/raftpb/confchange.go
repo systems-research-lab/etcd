@@ -89,7 +89,7 @@ func (c ConfChangeV2) EnterJoint() (autoLeave bool, ok bool) {
 		switch c.Transition {
 		case ConfChangeTransitionAuto:
 			autoLeave = true
-		case ConfChangeTransitionJointImplicit:
+		case ConfChangeTransitionJointImplicit: //autoleave set here based on joint implicit
 			autoLeave = true
 		case ConfChangeTransitionJointExplicit:
 			autoLeave = false

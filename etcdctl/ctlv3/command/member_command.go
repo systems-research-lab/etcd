@@ -312,12 +312,12 @@ func memberPromoteCommandFunc(cmd *cobra.Command, args []string) {
 }
 
 func memberSplitCommandFunc(cmd *cobra.Command, args []string) {
-	if len(args) < 1 {
+	/*if len(args) < 1 {
 		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("member IDs are not provided"))
-	}
-
-	clrs := make([]etcdserverpb.MemberList, 0)
-	for _, clrStr := range args {
+	}*/
+	//clrs := nil
+	//clrs := make([]etcdserverpb.MemberList, 0)
+	/*for _, clrStr := range args {
 		idStrs := strings.Split(clrStr, ",")
 		mems := make([]etcdserverpb.Member, 0)
 		for _, idStr := range idStrs {
@@ -328,7 +328,7 @@ func memberSplitCommandFunc(cmd *cobra.Command, args []string) {
 			mems = append(mems, etcdserverpb.Member{ID: id})
 		}
 		clrs = append(clrs, etcdserverpb.MemberList{Members: mems})
-	}
+	}*/
 
 	ctx, cancel := commandCtx(cmd)
 	_, err := mustClientFromCmd(cmd).MemberSplit(ctx, nil, explictLeave, leave)
