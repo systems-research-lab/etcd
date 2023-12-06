@@ -331,7 +331,7 @@ func memberSplitCommandFunc(cmd *cobra.Command, args []string) {
 	}
 
 	ctx, cancel := commandCtx(cmd)
-	_, err := mustClientFromCmd(cmd).MemberSplit(ctx, clrs, explictLeave, leave)
+	_, err := mustClientFromCmd(cmd).MemberSplit(ctx, nil, explictLeave, leave)
 	cancel()
 	if err != nil {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)
