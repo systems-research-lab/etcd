@@ -22,7 +22,7 @@ hack/tls-setup/certs
 *.bak
 .gobincache/
 server/data.etcd-*
-server/**/.out
+server/etcd.*.out
 # evaluation data
 evaluation/**/*.json
 evaluation/**/*.log
