@@ -21,12 +21,8 @@ hack/tls-setup/certs
 *.tmp
 *.bak
 .gobincache/
-<<<<<<< HEAD
 server/data.etcd-*
-
-=======
-/server/data.etcd-*
->>>>>>> server_probing_issue_001_01-11-2023
+server/**/.out
 # evaluation data
 evaluation/**/*.json
 evaluation/**/*.log
