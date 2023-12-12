@@ -404,6 +404,16 @@ func memberJointCommandFunc(cmd *cobra.Command, args []string) {
 	if err != nil {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)
 	}
+
+	cc := &cobra.Command{
+		Use:   "merge <memberEndpoints>",
+		Short: "Merge clusters (identified by member endpoints) into this one",
+		Long: `Merge clusters into this one.
+`,
+
+		Run: memberMergeCommandFunc,
+	}
+	memberSplitCommandFunc(cc, nil)
 }
 
 /*func memberJointCommandFunc(cmd *cobra.Command, args []string) {
