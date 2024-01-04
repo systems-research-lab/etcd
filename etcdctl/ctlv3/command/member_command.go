@@ -17,13 +17,12 @@ package command
 import (
 	"errors"
 	"fmt"
-	"go.etcd.io/etcd/api/v3/etcdserverpb"
-	"strconv"
-	"strings"
-
 	"github.com/spf13/cobra"
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/pkg/v3/cobrautl"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -378,6 +377,7 @@ func memberMergeCommandFunc(cmd *cobra.Command, args []string) {
 }
 
 func memberJointCommandFunc(cmd *cobra.Command, args []string) {
+
 	if len(add) == 0 && len(remove) == 0 {
 		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("not members provided"))
 	}
@@ -397,23 +397,28 @@ func memberJointCommandFunc(cmd *cobra.Command, args []string) {
 			removeIds = append(removeIds, id)
 		}
 	}
-
+	//log.Print("cmd time")
 	ctx, cancel := commandCtx(cmd)
+	//start := time.Now()
+
 	_, err := mustClientFromCmd(cmd).MemberJoint(ctx, addUrls, removeIds)
 	cancel()
+
 	if err != nil {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)
 	}
 
-	cc := &cobra.Command{
-		Use:   "merge <memberEndpoints>",
-		Short: "Merge clusters (identified by member endpoints) into this one",
-		Long: `Merge clusters into this one.
-`,
+	/*
+			cc := &cobra.Command{
+				Use:   "split <memberIDs>",
+				Short: "Split members (comma seperated IDs) from the cluster",
+				Long: `Split members from the cluster.
+		`,
 
-		Run: memberMergeCommandFunc,
-	}
-	memberSplitCommandFunc(cc, nil)
+				Run: memberSplitCommandFunc,
+			}
+
+			memberSplitCommandFunc(cc, nil)*/
 }
 
 /*func memberJointCommandFunc(cmd *cobra.Command, args []string) {

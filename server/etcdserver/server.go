@@ -1575,7 +1575,7 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 	pbutil.MustUnmarshal(&cc, entry.Data)
 	cc.ConfTerm = entry.Term
 	cc.ConfIndex = entry.Index
-	log.Print("cc.Context: ", string(cc.Context))
+	//log.Print("cc.Context: ", string(cc.Context))
 	if cc.Transition != raftpb.ConfChangeTransitionJointImplicit &&
 		cc.Transition != raftpb.ConfChangeTransitionJointLeave &&
 		cc.Transition != raftpb.ConfChangeTransitionSplitImplicit &&
@@ -1637,7 +1637,7 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 					}
 				}
 			}
-			log.Print("cc.Context: ", string(cc.Context))
+			//log.Print("cc.Context: ", string(cc.Context))
 			triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
 			if err != nil {
 				s.lg.Panic("parse conf change id failed", zap.Error(err))
@@ -2008,12 +2008,17 @@ func (s *EtcdServer) PromoteMember(ctx context.Context, id uint64) ([]*membershi
 func (s *EtcdServer) SplitMember(ctx context.Context, clusters []pb.MemberList, explictLeave, leave bool) ([]membership.Member, error) {
 	if leave { // leave joint consensus for split
 		id := s.reqIDGen.Next()
+		start := time.Now()
+		//log.Print("leave joint")
 		if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{
 			Context:    []byte(strconv.FormatUint(id, 10)),
 			Transition: raftpb.ConfChangeTransitionJointLeave}); err != nil {
 			//s.w.Trigger(id, nil)
+
 			return nil, err
 		}
+		log.Print("LEVE JOINT ", time.Since(start))
+		//log.Print("returning without error")
 
 	} /*else { // enter joint consensus for split
 		changes := make([]raftpb.ConfChangeSingle, 0)
@@ -2060,7 +2065,6 @@ func (s *EtcdServer) SplitMember(ctx context.Context, clusters []pb.MemberList, 
 			}
 		}
 	}*/
-
 	return nil, nil
 }
 
@@ -2086,6 +2090,7 @@ func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) (
 }
 
 func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error) {
+
 	changes := make([]raftpb.ConfChangeSingle, 0, len(addMembs)+len(removeMembs))
 	for _, mem := range addMembs {
 		if s.cluster.IsMemberExist(mem.ID) {
@@ -2144,13 +2149,17 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 			zap.String("local-member-id", s.ID().String()),
 			zap.String("raft-conf-change", cc.Transition.String()),
 		)
+		log.Print(time.Since(start))
+
 		return resp.membs, resp.err
 
 	case <-ctx.Done():
+		log.Print(time.Since(start))
 		s.w.Trigger(id, nil) // GC wait
 		return nil, s.parseProposeCtxErr(ctx.Err(), start)
 
 	case <-s.stopping:
+		log.Print(time.Since(start))
 		return nil, ErrStopped
 	}
 }
