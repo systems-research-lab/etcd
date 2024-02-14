@@ -1,0 +1,72 @@
+Last login: Wed Feb  7 23:10:44 on ttys001
+kang@JHankyucBookAir ~ % ssh -o StrictHostKeyChecking=no -i .ssh/id_rsa ubuntu@199.94.60.202
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that a host key has just been changed.
+The fingerprint for the ED25519 key sent by the remote host is
+SHA256:eZfcrAVlcuwlepB5GWKr8F/RtD6n/ETqlMVR6UF1YZM.
+Please contact your system administrator.
+Add correct host key in /Users/kang/.ssh/known_hosts to get rid of this message.
+Offending ED25519 key in /Users/kang/.ssh/known_hosts:14
+Password authentication is disabled to avoid man-in-the-middle attacks.
+Keyboard-interactive authentication is disabled to avoid man-in-the-middle attacks.
+UpdateHostkeys is disabled because the host key is not trusted.
+Welcome to Ubuntu 22.04.1 LTS (GNU/Linux 5.15.0-43-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Thu Feb  8 04:15:44 UTC 2024
+
+  System load:  0.0                Processes:             97
+  Usage of /:   15.1% of 19.20GB   Users logged in:       1
+  Memory usage: 7%                 IPv4 address for ens3: 192.168.0.95
+  Swap usage:   0%
+
+
+202 updates can be applied immediately.
+127 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+
+Last login: Thu Feb  8 04:10:46 2024 from 67.189.251.84
+^[[Aubuntu@recraft-0:~$ ssh ubuntu@192.168.0.167
+Welcome to Ubuntu 22.04.1 LTS (GNU/Linux 5.15.0-43-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Thu Feb  8 04:15:39 UTC 2024
+
+  System load:  0.0                Processes:             90
+  Usage of /:   15.1% of 19.20GB   Users logged in:       0
+  Memory usage: 7%                 IPv4 address for ens3: 192.168.0.167
+  Swap usage:   0%
+
+
+202 updates can be applied immediately.
+127 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+
+Last login: Thu Feb  8 03:39:37 2024 from 67.189.251.84
+ubuntu@recraft-4:~$ ls
+clone_repo.sh  env.sh  etcd  go  pull_repo.sh  snap
+ubuntu@recraft-4:~$ cat etcd/server/etcd.4.out 
+{"level":"info","ts":"2024-02-08T04:15:39.597Z","caller":"etcdmain/etcd.go:73","msg":"Running: ","args":["./server","--data-dir=data.etcd.4","--name=4","--heartbeat-interval=50","--election-timeout=500","--listen-client-urls=http://192.168.0.167:2379","--advertise-client-urls=http://192.168.0.167:2379","--initial-advertise-peer-urls=http://192.168.0.167:2380","--listen-peer-urls=http://192.168.0.167:2380","--initial-cluster=4=http://192.168.0.167:2380,6=http://192.168.0.176:2380","--initial-cluster-state=existing","--pre-vote=false","--log-level=debug"]}
+{"level":"info","ts":"2024-02-08T04:15:39.597Z","caller":"embed/etcd.go:124","msg":"configuring peer listeners","listen-peer-urls":["http://192.168.0.167:2380"]}
+{"level":"info","ts":"2024-02-08T04:15:39.598Z","caller":"embed/etcd.go:132","msg":"configuring client listeners","listen-client-urls":["http://192.168.0.167:2379"]}
+{"level":"info","ts":"2024-02-08T04:15:39.598Z","caller":"embed/etcd.go:306","msg":"starting an etcd server","etcd-version":"3.5.5","git-sha":"Not provided (use ./build instead of go build)","go-version":"go1.21.6","go-os":"linux","go-arch":"amd64","max-cpu-set":1,"max-cpu-available":1,"member-initialized":false,"name":"4","data-dir":"data.etcd.4","wal-dir":"","wal-dir-dedicated":"","member-dir":"data.etcd.4/member","force-new-cluster":false,"heartbeat-interval":"50ms","election-timeout":"500ms","initial-election-tick-advance":true,"snapshot-count":100000000,"max-wals":5,"max-snapshots":5,"snapshot-catchup-entries":5000,"initial-advertise-peer-urls":["http://192.168.0.167:2380"],"listen-peer-urls":["http://192.168.0.167:2380"],"advertise-client-urls":["http://192.168.0.167:2379"],"listen-client-urls":["http://192.168.0.167:2379"],"listen-metrics-urls":[],"cors":["*"],"host-whitelist":["*"],"initial-cluster":"4=http://192.168.0.167:2380,6=http://192.168.0.176:2380","initial-cluster-state":"existing","initial-cluster-token":"etcd-cluster","quota-backend-bytes":2147483648,"max-request-bytes":1572864,"max-concurrent-streams":4294967295,"pre-vote":false,"initial-corrupt-check":false,"corrupt-check-time-interval":"0s","compact-check-time-enabled":false,"compact-check-time-interval":"1m0s","auto-compaction-mode":"periodic","auto-compaction-retention":"0s","auto-compaction-interval":"0s","discovery-url":"","discovery-proxy":"","downgrade-check-interval":"5s"}
+{"level":"info","ts":"2024-02-08T04:15:39.614Z","caller":"etcdserver/backend.go:81","msg":"opened backend db","path":"data.etcd.4/member/snap/db","took":"15.583412ms"}
+{"level":"warn","ts":"2024-02-08T04:15:39.618Z","caller":"etcdserver/cluster_util.go:79","msg":"failed to get cluster response","address":"http://192.168.0.176:2380/members","error":"Get \"http://192.168.0.176:2380/members\": dial tcp 192.168.0.176:2380: connect: connection refused"}
+{"level":"info","ts":"2024-02-08T04:15:39.650Z","caller":"embed/etcd.go:373","msg":"closing etcd server","name":"4","data-dir":"data.etcd.4","advertise-peer-urls":["http://192.168.0.167:2380"],"advertise-client-urls":["http://192.168.0.167:2379"]}
+{"level":"info","ts":"2024-02-08T04:15:39.650Z","caller":"embed/etcd.go:375","msg":"closed etcd server","name":"4","data-dir":"data.etcd.4","advertise-peer-urls":["http://192.168.0.167:2380"],"advertise-client-urls":["http://192.168.0.167:2379"]}
+{"level":"warn","ts":"2024-02-08T04:15:39.683Z","caller":"etcdmain/etcd.go:146","msg":"failed to start etcd","error":"cannot fetch cluster info from peer urls: could not retrieve cluster information from the given URLs"}
+{"level":"fatal","ts":"2024-02-08T04:15:39.683Z","caller":"etcdmain/etcd.go:204","msg":"discovery failed","error":"cannot fetch cluster info from peer urls: could not retrieve cluster information from the given URLs","stacktrace":"go.etcd.io/etcd/server/v3/etcdmain.startEtcdOrProxyV2\n\t/home/ubuntu/etcd/server/etcdmain/etcd.go:204\ngo.etcd.io/etcd/server/v3/etcdmain.Main\n\t/home/ubuntu/etcd/server/etcdmain/main.go:40\nmain.main\n\t/home/ubuntu/etcd/server/main.go:32\nruntime.main\n\t/snap/go/10489/src/runtime/proc.go:267"}
+ubuntu@recraft-4:~$ client_loop: send disconnect: Broken pipe
+kang@JHankyucBookAir ~ % 

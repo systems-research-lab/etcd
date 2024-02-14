@@ -1913,8 +1913,13 @@ func (s *EtcdServer) AddMember(ctx context.Context, memb membership.Member) ([]*
 	if memb.IsLearner {
 		cc.Type = raftpb.ConfChangeAddLearnerNode
 	}
+	start := time.Now()
 
-	return s.configure(ctx, cc)
+	r, error := s.configure(ctx, cc)
+
+	log.Print("LEAVE JOINT ", time.Since(start))
+
+	return r, error
 }
 
 func (s *EtcdServer) mayAddMember(memb membership.Member) error {
@@ -2136,7 +2141,6 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 		s.w.Trigger(id, nil)
 		return nil, err
 	}
-
 	lg := s.Logger()
 	select {
 	case x := <-ch:
@@ -2150,7 +2154,6 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 			zap.String("raft-conf-change", cc.Transition.String()),
 		)
 		log.Print(time.Since(start))
-
 		return resp.membs, resp.err
 
 	case <-ctx.Done():

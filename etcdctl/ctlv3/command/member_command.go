@@ -400,7 +400,7 @@ func memberJointCommandFunc(cmd *cobra.Command, args []string) {
 	//log.Print("cmd time")
 	ctx, cancel := commandCtx(cmd)
 	//start := time.Now()
-
+	fmt.Print(addUrls)
 	_, err := mustClientFromCmd(cmd).MemberJoint(ctx, addUrls, removeIds)
 	cancel()
 
