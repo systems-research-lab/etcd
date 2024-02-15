@@ -73,3 +73,14 @@ yes
 #remote_clone_repo.sh
 
 ssh -o StrictHostKeyChecking=no ubuntu@192.168.0.8 "./clone_repo.sh" & ssh ubuntu@192.168.0.138 "./clone_repo.sh" & ssh ubuntu@192.168.0.12 "./clone_repo.sh" & ssh ubuntu@192.168.0.98 "./clone_repo.sh"
+
+ssh -o StrictHostKeyChecking=no ubuntu@192.168.0.162 "./pull_repo.sh"
+ssh -o StrictHostKeyChecking=no ubuntu@192.168.0.8 "./pull_repo.sh" & ssh -o StrictHostKeyChecking=no ubuntu@192.168.0.32 "./pull_repo.sh" & ssh -o StrictHostKeyChecking=no ubuntu@192.168.0.167 "./pull_repo.sh"& ssh -o StrictHostKeyChecking=no ubuntu@192.168.0.176 "./pull_repo.sh"
+
+#!/bin/bash
+cd ~/etcd
+git checkout $1
+cd ~/etcd && go build .
+cd ~/etcd/server && go build .
+cd ~/etcd/etcdctl && go build .
+#checkout_repo.sh

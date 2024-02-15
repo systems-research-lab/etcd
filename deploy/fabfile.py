@@ -116,7 +116,7 @@ def join(ctx, names, cluster_url, logging='fatal'):
     cluster_url format: 1=http://127.0.0.1:1380,2=http://127.0.0.1:2380,3=http://127.0.0.1:3380,4=http://127.0.0.1:4380,5=http://127.0.0.1:5380,6=http://127.0.0.1:6380
     """
     configs = parse_configs(cluster_url, False, logging)
-  
+
     #print(cluster_url)
     names = set(names.split(','))
     for cfg in configs:
