@@ -22,6 +22,7 @@ import (
 	"expvar"
 	"fmt"
 	"go.etcd.io/etcd/pkg/v3/measure"
+	"log"
 	"math"
 	"math/rand"
 	"net/http"
@@ -2138,10 +2139,12 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 			zap.String("local-member-id", s.ID().String()),
 			zap.String("raft-conf-change", cc.Transition.String()),
 		)
+		log.Print("JOINT ", time.Since(start))
 		return resp.membs, resp.err
 
 	case <-ctx.Done():
 		s.w.Trigger(id, nil) // GC wait
+		log.Print("JOINT ERR", time.Since(start))
 		return nil, s.parseProposeCtxErr(ctx.Err(), start)
 
 	case <-s.stopping:
