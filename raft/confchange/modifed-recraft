@@ -1,0 +1,57 @@
+GOROOT=/usr/local/go #gosetup
+GOPATH=/Users/kang/go #gosetup
+/usr/local/go/bin/go build -o /Users/kang/Library/Caches/JetBrains/GoLand2023.1/tmp/GoLand/___etcd_1 go.etcd.io/etcd/server/v3 #gosetup
+/Users/kang/Library/Caches/JetBrains/GoLand2023.1/tmp/GoLand/___etcd_1
+2024/04/04 00:02:26 majority quorum votesresult 2
+2024/04/04 00:02:26 PENDING 2
+2024/04/04 00:02:26 MISSING 2
+2024/04/04 00:02:28 majority quorum votesresult 2
+2024/04/04 00:02:28 PENDING 2
+2024/04/04 00:02:28 MISSING 2
+2024/04/04 00:02:28 majority quorum votesresult 2
+2024/04/04 00:02:28 WON 2
+2024/04/04 00:02:29 majority quorum votesresult 2
+2024/04/04 00:02:29 WON 2
+2024/04/04 00:02:30 majority quorum votesresult 2
+2024/04/04 00:02:30 WON 2
+2024/04/04 00:02:31 majority quorum votesresult 2
+2024/04/04 00:02:31 WON 2
+2024/04/04 00:02:32 majority quorum votesresult 2
+2024/04/04 00:02:32 WON 2
+2024/04/04 00:02:33 majority quorum votesresult 2
+2024/04/04 00:02:33 WON 2
+2024/04/04 00:02:34 majority quorum votesresult 2
+2024/04/04 00:02:34 WON 2
+2024/04/04 00:02:35 majority quorum votesresult 2
+2024/04/04 00:02:35 WON 2
+2024/04/04 00:02:36 majority quorum votesresult 2
+2024/04/04 00:02:36 WON 2
+2024/04/04 00:02:36 confchange
+2024/04/04 00:02:36 (7012361848016961248 7905197988486086812 8938357745929296221 9485432922116369429)&&(7905197988486086812 8938357745929296221 9485432922116369429)&&()&&()&&()&&()
+2024/04/04 00:02:36 3
+2024/04/04 00:02:36 3
+2024/04/04 00:02:36 set autoleave
+2024/04/04 00:02:37 majority quorum votesresult 3
+2024/04/04 00:02:37 WON 3
+2024/04/04 00:02:38 majority quorum votesresult 3
+2024/04/04 00:02:38 WON 3
+2024/04/04 00:02:39 majority quorum votesresult 3
+2024/04/04 00:02:39 WON 3
+2024/04/04 00:02:40 majority quorum votesresult 3
+2024/04/04 00:02:40 WON 3
+2024/04/04 00:02:41 majority quorum votesresult 3
+2024/04/04 00:02:41 WON 3
+2024/04/04 00:02:42 majority quorum votesresult 3
+2024/04/04 00:02:42 WON 3
+2024/04/04 00:02:43 majority quorum votesresult 3
+2024/04/04 00:02:43 WON 3
+2024/04/04 00:02:44 majority quorum votesresult 3
+2024/04/04 00:02:44 WON 3
+2024/04/04 00:02:45 majority quorum votesresult 3
+2024/04/04 00:02:45 WON 3
+2024/04/04 00:02:46 majority quorum votesresult 3
+2024/04/04 00:02:46 WON 3
+^C
+Process finished with the exit code 130 (interrupted by signal 2: SIGINT)
+
+

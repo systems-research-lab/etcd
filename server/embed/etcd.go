@@ -241,8 +241,10 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 	print(e.cfg.logger, *cfg, srvcfg, memberInitialized)
 
 	if e.Server, err = etcdserver.NewServer(srvcfg); err != nil {
+		//panic("ETCD SERVER ERROR")
 		return e, err
 	}
+	//panic("ETCD SERVER ERROR")
 
 	// buffer channel so goroutines on closed connections won't wait forever
 	e.errc = make(chan error, len(e.Peers)+len(e.Clients)+2*len(e.sctxs))

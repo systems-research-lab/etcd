@@ -17,6 +17,7 @@ package confchange
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -75,7 +76,23 @@ func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker
 	if err := c.apply(&cfg, prs, ccs...); err != nil {
 		return c.err(err)
 	}
-	cfg.AutoLeave = autoLeave
+	log.Print(cfg.Voters)
+	log.Printf("confchange")
+	log.Print(cfg.Voters)
+	var Qold = len(cfg.Voters[0])/2 + 1
+	var Nold = len(cfg.Voters[0])
+	var n = int(len(cfg.Voters[0]) - len(cfg.Voters[1]))
+	var q_r = Nold + n - Qold + 1
+	var q_m = len(cfg.Voters[0])/2 + 1
+	log.Print(q_r)
+	log.Print(q_m)
+	if q_r == q_m {
+		log.Print("set autoleave")
+		cfg.AutoLeave = autoLeave
+	}
+
+	//cfg.AutoLeave = autoLeave
+
 	return checkAndReturn(cfg, prs)
 }
 
@@ -304,6 +321,7 @@ func (c Changer) Simple(ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.Pro
 		err := errors.New("can't apply simple config change in joint config")
 		return c.err(err)
 	}
+	log.Print(cfg.AutoLeave)
 	if err := c.apply(&cfg, prs, ccs...); err != nil {
 		return c.err(err)
 	}

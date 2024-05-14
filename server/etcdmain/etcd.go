@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -132,7 +133,15 @@ func startEtcdOrProxyV2(args []string) {
 	} else {
 		shouldProxy := cfg.isProxy()
 		if !shouldProxy {
+			lg.Warn("We are starting a doomed cluster")
+			//time.Sleep(time.Second * 10)
 			stopped, errc, err = startEtcd(&cfg.ec)
+			if err != nil {
+				for err != nil {
+					stopped, errc, err = startEtcd(&cfg.ec)
+				}
+			}
+
 			if derr, ok := err.(*etcdserver.DiscoveryError); ok && derr.Err == v2discovery.ErrFullCluster {
 				if cfg.shouldFallbackToProxy() {
 					lg.Warn(
@@ -201,7 +210,7 @@ func startEtcdOrProxyV2(args []string) {
 			}
 			os.Exit(1)
 		}
-		lg.Fatal("discovery failed", zap.Error(err))
+		//lg.Fatal("discovery failed", zap.Error(err))
 	}
 
 	osutil.HandleInterrupts(lg)
@@ -227,6 +236,7 @@ func startEtcdOrProxyV2(args []string) {
 func startEtcd(cfg *embed.Config) (<-chan struct{}, <-chan error, error) {
 	e, err := embed.StartEtcd(cfg)
 	if err != nil {
+		log.Print("failure here")
 		return nil, nil, err
 	}
 	osutil.RegisterInterruptHandler(e.Close)
@@ -234,6 +244,7 @@ func startEtcd(cfg *embed.Config) (<-chan struct{}, <-chan error, error) {
 	case <-e.Server.ReadyNotify(): // wait for e.Server to join the cluster
 	case <-e.Server.StopNotify(): // publish aborted from 'ErrStopped'
 	}
+	log.Print("failure here2")
 	return e.Server.StopNotify(), e.Err(), nil
 }
 
