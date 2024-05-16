@@ -207,18 +207,25 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 		}
 	}
 	var q int
-	if quorum == 0 {
-		q = len(c)/2 + 1
-		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
+	var n = int(quorum)
+	if quorum > 0 {
+		var Qold = len(c)/2 + 1
+		var Nold = len(c)
+		q = Nold + n - Qold + 1
+		//	log.Printf("variable quorum votesresult %[1]d\n", q)
 	} else {
-		q = int(quorum)
-		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
+		q = len(c)/2 + 1
+		//	log.Printf("majority quorum votesresult %[1]d\n", q)
 	}
 	if ny[1] >= q {
+		//log.Printf("WON %[1]d\n", q)
 		return VoteWon
 	}
 	if ny[1]+missing >= q {
+		//log.Printf("PENDING %[1]d\n", q)
+		//log.Printf("MISSING %[1]d\n", missing)
 		return VotePending
 	}
+	//log.Printf("LOST %[1]d\n", q)
 	return VoteLost
 }

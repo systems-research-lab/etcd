@@ -67,14 +67,13 @@ func (c JointConfig) CommittedIndex(l AckedIndexer, quorum uint64) Index {
 // a result indicating whether the vote is pending, lost, or won. A joint quorum
 // requires both majority quorums to vote in favor.
 func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteResult {
-	ret := VoteWon
-	for _, mc := range c {
-		r := mc.VoteResult(votes, quorum)
-		if r == VoteLost {
-			return VoteLost
-		} else if r == VotePending {
-			ret = r
-		}
+	//log.Print(c)
+	if len(c[1]) > 0 {
+		//log.Print("raft/joint.go: setting quorum")
+		quorum = uint64(len(c[0]) - len(c[1]))
+		//log.Print("raft/joint.go: ReCraft config: ", c[0], "with n = ", quorum)
+		return c[0].VoteResult(votes, quorum)
+	} else {
+		return c[0].VoteResult(votes, quorum)
 	}
-	return ret
 }
