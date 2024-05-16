@@ -22,6 +22,7 @@ import (
 	"expvar"
 	"fmt"
 	"go.etcd.io/etcd/pkg/v3/measure"
+	"log"
 	"math"
 	"math/rand"
 	"net/http"
@@ -1912,8 +1913,13 @@ func (s *EtcdServer) AddMember(ctx context.Context, memb membership.Member) ([]*
 	if memb.IsLearner {
 		cc.Type = raftpb.ConfChangeAddLearnerNode
 	}
+	start := time.Now()
 
-	return s.configure(ctx, cc)
+	r, error := s.configure(ctx, cc)
+
+	log.Print("ENTER JOINT ", time.Since(start))
+
+	return r, error
 }
 
 func (s *EtcdServer) mayAddMember(memb membership.Member) error {
@@ -2141,6 +2147,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 		return resp.membs, resp.err
 
 	case <-ctx.Done():
+		log.Print(time.Since(start))
 		s.w.Trigger(id, nil) // GC wait
 		return nil, s.parseProposeCtxErr(ctx.Err(), start)
 
