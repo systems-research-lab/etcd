@@ -133,6 +133,11 @@ func startEtcdOrProxyV2(args []string) {
 		shouldProxy := cfg.isProxy()
 		if !shouldProxy {
 			stopped, errc, err = startEtcd(&cfg.ec)
+			if err != nil {
+				for err != nil {
+					stopped, errc, err = startEtcd(&cfg.ec)
+				}
+			}
 			if derr, ok := err.(*etcdserver.DiscoveryError); ok && derr.Err == v2discovery.ErrFullCluster {
 				if cfg.shouldFallbackToProxy() {
 					lg.Warn(
