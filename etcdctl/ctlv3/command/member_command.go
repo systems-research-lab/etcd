@@ -50,6 +50,7 @@ func NewMemberCommand() *cobra.Command {
 	mc.AddCommand(NewMemberSplitCommand())
 	mc.AddCommand(NewMemberMergeCommand())
 	mc.AddCommand(NewMemberJointCommand())
+	mc.AddCommand(NewMemberLeaveJointCommand())
 
 	return mc
 }
@@ -168,6 +169,18 @@ func NewMemberJointCommand() *cobra.Command {
 
 	cc.Flags().StringVar(&add, "add", "", "comma seperated urls for nodes to add, one peer url for one node")
 	cc.Flags().StringVar(&remove, "remove", "", "comma seperated IDs for nodes to remove")
+
+	return cc
+}
+func NewMemberLeaveJointCommand() *cobra.Command {
+	cc := &cobra.Command{
+		Use:   "leave joint <cluster memberIDs>",
+		Short: "leave joint cluster",
+		Long: `leave members from the cluster.
+`,
+
+		Run: memberLeaveJointCommandFunc,
+	}
 
 	return cc
 }
@@ -404,4 +417,8 @@ func memberJointCommandFunc(cmd *cobra.Command, args []string) {
 	if err != nil {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)
 	}
+}
+
+func memberLeaveJointCommandFunc(cmd *cobra.Command, args []string) {
+
 }
