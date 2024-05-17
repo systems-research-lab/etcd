@@ -420,5 +420,10 @@ func memberJointCommandFunc(cmd *cobra.Command, args []string) {
 }
 
 func memberLeaveJointCommandFunc(cmd *cobra.Command, args []string) {
-
+	ctx, cancel := commandCtx(cmd)
+	_, err := mustClientFromCmd(cmd).MemberJoint(ctx, nil, nil)
+	cancel()
+	if err != nil {
+		cobrautl.ExitWithError(cobrautl.ExitError, err)
+	}
 }

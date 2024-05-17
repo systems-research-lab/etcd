@@ -59,6 +59,8 @@ type Cluster interface {
 	MemberMerge(ctx context.Context, clusters map[uint64]pb.MemberList) (*MemberMergeResponse, error)
 
 	MemberJoint(ctx context.Context, addPeersAddr []string, removePeersId []uint64) (*MemberJointResponse, error)
+
+	MemberLeaveJoint(ctx context.Context) (*MemberJointResponse, error)
 }
 
 type cluster struct {
@@ -169,6 +171,16 @@ func (c *cluster) MemberMerge(ctx context.Context, clusters map[uint64]pb.Member
 
 func (c *cluster) MemberJoint(ctx context.Context, addPeersAddr []string, removePeersId []uint64) (*MemberJointResponse, error) {
 	r := &pb.MemberJointRequest{AddPeersUrl: addPeersAddr, RemovePeersId: removePeersId}
+	resp, err := c.remote.MemberJoint(ctx, r, c.callOpts...)
+	if err != nil {
+		return nil, toErr(ctx, err)
+	}
+	return (*MemberJointResponse)(resp), nil
+}
+
+// MemberLeaveJoint Use a nil configuraiton change to trigger leave_joint
+func (c *cluster) MemberLeaveJoint(ctx context.Context) (*MemberJointResponse, error) {
+	r := &pb.MemberJointRequest{AddPeersUrl: nil, RemovePeersId: nil}
 	resp, err := c.remote.MemberJoint(ctx, r, c.callOpts...)
 	if err != nil {
 		return nil, toErr(ctx, err)

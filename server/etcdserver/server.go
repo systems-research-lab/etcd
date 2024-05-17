@@ -2086,6 +2086,9 @@ func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) (
 }
 
 func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error) {
+	if addMembs == nil && removeMembs == nil {
+		log.Print("leave joint here")
+	}
 	changes := make([]raftpb.ConfChangeSingle, 0, len(addMembs)+len(removeMembs))
 	for _, mem := range addMembs {
 		if s.cluster.IsMemberExist(mem.ID) {
