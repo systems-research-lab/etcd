@@ -2088,6 +2088,17 @@ func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) (
 func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error) {
 	if addMembs == nil && removeMembs == nil {
 		log.Print("leave joint here")
+		id := s.reqIDGen.Next()
+		start := time.Now()
+		//log.Print("leave joint")
+		if err := s.r.ProposeConfChange(ctx, raftpb.ConfChangeV2{
+			Context:    []byte(strconv.FormatUint(id, 10)),
+			Transition: raftpb.ConfChangeTransitionJointLeave}); err != nil {
+			//s.w.Trigger(id, nil)
+
+			return nil, err
+		}
+		log.Print("LEAVE JOINT ", time.Since(start))
 	}
 	changes := make([]raftpb.ConfChangeSingle, 0, len(addMembs)+len(removeMembs))
 	for _, mem := range addMembs {
