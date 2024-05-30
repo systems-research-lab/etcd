@@ -2086,6 +2086,8 @@ func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) (
 }
 
 func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error) {
+	log.Print(addMembs == nil)
+	log.Print(removeMembs == nil)
 	if addMembs == nil && removeMembs == nil {
 		log.Print("leave joint here")
 		id := s.reqIDGen.Next()
@@ -2099,6 +2101,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 			return nil, err
 		}
 		log.Print("LEAVE JOINT ", time.Since(start))
+		return nil, nil
 	}
 	changes := make([]raftpb.ConfChangeSingle, 0, len(addMembs)+len(removeMembs))
 	for _, mem := range addMembs {

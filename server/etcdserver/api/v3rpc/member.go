@@ -122,22 +122,32 @@ func (cs *ClusterServer) MemberMerge(ctx context.Context, r *pb.MemberMergeReque
 }
 
 func (cs *ClusterServer) MemberJoint(ctx context.Context, r *pb.MemberJointRequest) (*pb.MemberJointResponse, error) {
-	addMembs := make([]membership.Member, 0)
-	for _, url := range r.AddPeersUrl {
-		urls, err := types.NewURLs([]string{url})
-		if err != nil {
-			return nil, rpctypes.ErrGRPCMemberBadURLs
+	//var membs
+	if r.AddPeersUrl != nil {
+		addMembs := make([]membership.Member, 0)
+		for _, url := range r.AddPeersUrl {
+			urls, err := types.NewURLs([]string{url})
+			if err != nil {
+				return nil, rpctypes.ErrGRPCMemberBadURLs
+			}
+
+			now := time.Now()
+			addMembs = append(addMembs, *membership.NewMember("", urls, "", &now))
 		}
-
-		now := time.Now()
-		addMembs = append(addMembs, *membership.NewMember("", urls, "", &now))
+		membs, err := cs.server.JointMember(ctx, addMembs, r.RemovePeersId)
+		if err != nil {
+			return nil, err
+		}
+		return &pb.MemberJointResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
+	} else if r.AddPeersUrl == nil {
+		membs, err := cs.server.JointMember(ctx, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		return &pb.MemberJointResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
 	}
 
-	membs, err := cs.server.JointMember(ctx, addMembs, r.RemovePeersId)
-	if err != nil {
-		return nil, err
-	}
-	return &pb.MemberJointResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
+	return nil, nil
 }
 
 func (cs *ClusterServer) header() *pb.ResponseHeader {

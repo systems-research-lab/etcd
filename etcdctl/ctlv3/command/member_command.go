@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
+	"log"
 	"strconv"
 	"strings"
 
@@ -181,7 +182,6 @@ func NewMemberLeaveJointCommand() *cobra.Command {
 
 		Run: memberLeaveJointCommandFunc,
 	}
-
 	return cc
 }
 
@@ -361,14 +361,16 @@ func memberMergeCommandFunc(cmd *cobra.Command, args []string) {
 	urlStrs := strings.Split(args[0], ",")
 	clusters := map[uint64]etcdserverpb.MemberList{}
 	for _, url := range urlStrs {
+		log.Print(url)
 		client, err := clientv3.New(clientv3.Config{Endpoints: []string{url}})
 		if err != nil {
 			cobrautl.ExitWithError(cobrautl.ExitBadArgs,
 				fmt.Errorf("cannot create client by url (%v): %v", url, err))
 		}
-
+		log.Print(client.MemberList(ctx))
 		resp, err := client.MemberList(ctx)
 		if err != nil {
+			log.Print("error 1")
 			cobrautl.ExitWithError(cobrautl.ExitBadArgs,
 				fmt.Errorf("cannot list member by url (%v): %v", url, err))
 		}
@@ -391,6 +393,7 @@ func memberMergeCommandFunc(cmd *cobra.Command, args []string) {
 }
 
 func memberJointCommandFunc(cmd *cobra.Command, args []string) {
+	//	cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("not members provided"))
 	if len(add) == 0 && len(remove) == 0 {
 		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("not members provided"))
 	}

@@ -1,0 +1,11 @@
+data-dir: data.etcd-6
+name: "6"
+initial-advertise-peer-urls: http://127.0.0.1:6380
+listen-peer-urls: http://127.0.0.1:6380
+advertise-client-urls: http://127.0.0.1:6379
+listen-client-urls: http://127.0.0.1:6379
+initial-cluster: 4=http://127.0.0.1:4380,6=http://127.0.0.1:6380
+pre-vote: false
+initial-cluster-state: new
+initial-cluster-token: token
+log-level: fatal
