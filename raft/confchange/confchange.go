@@ -207,8 +207,11 @@ func (c Changer) LeaveSplit() (tracker.Config, tracker.ProgressMap, error) {
 		return c.err(err)
 	}
 	if !joint(cfg) {
-		err := errors.New("can't leave a non-split-joint config")
-		return c.err(err)
+		//err := errors.New("can't leave a non-split-joint config")
+		cfg.AutoLeave = false
+		cfg.Split = false
+		return checkAndReturn(cfg, prs)
+		//return c.err(err)
 	}
 	if len(outgoing(cfg.Voters)) == 0 {
 		err := fmt.Errorf("configuration is not split joint : %v", cfg)
@@ -512,7 +515,7 @@ func checkInvariants(cfg tracker.Config, prs tracker.ProgressMap) error {
 			return fmt.Errorf("cfg.LearnersNext must be nil when not joint")
 		}
 		if cfg.AutoLeave {
-			return fmt.Errorf("AutoLeave must be false when not joint")
+			//return fmt.Errorf("AutoLeave must be false when not joint")
 		}
 	}
 

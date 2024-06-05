@@ -21,7 +21,6 @@ import (
 	"math"
 	"math/rand"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1939,11 +1938,14 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 			return changer.EnterJoint(autoLeave, cc.Changes...)
 		} else if autoLeave, ok = cc.EnterSplit(); ok {
 			measure.Update() <- measure.Measure{SplitEnter: measure.Time(time.Now())}
-			clrIdx, err := strconv.Atoi(string(cc.Context))
-			if err != nil {
-				panic("parse clr idx failed")
+			/*clrIdx, err := strconv.Atoi(string(cc.Context))
+			if len(string(cc.Context)) == 0 {
+				panic("empty string")
 			}
-			return changer.EnterSplit(autoLeave, clrIdx, cc.Changes...)
+			if err != nil {
+				panic(err)
+			}*/
+			return changer.EnterSplit(autoLeave, 0, cc.Changes...)
 		} else if cc.LeaveSplit() {
 			measure.Update() <- measure.Measure{SplitLeave: measure.Time(time.Now())}
 			return changer.LeaveSplit()

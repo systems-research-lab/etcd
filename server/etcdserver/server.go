@@ -2030,6 +2030,7 @@ func (s *EtcdServer) SplitMember(ctx context.Context, clusters []pb.MemberList, 
 						Context: []byte(strconv.Itoa(idx)),
 					})
 			}
+			//panic([]byte(strconv.Itoa(idx)))
 		}
 
 		if explictLeave {
