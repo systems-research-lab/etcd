@@ -269,3 +269,8 @@ func checkRequestOp(u *pb.RequestOp, maxTxnOps int) error {
 		return rpctypes.ErrGRPCKeyNotFound
 	}
 }
+
+func (ks *kvServer) PutP(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, error) {
+	// Since we want to use same implementation as Put
+	return ks.Put(ctx, r)
+}

@@ -36,6 +36,10 @@ func (s *kvs2kvc) Put(ctx context.Context, in *pb.PutRequest, opts ...grpc.CallO
 	return s.kvs.Put(ctx, in)
 }
 
+func (s *kvs2kvc) PutP(ctx context.Context, in *pb.PutRequest, opts ...grpc.CallOption) (*pb.PutResponse, error) {
+	return s.Put(ctx, in)
+}
+
 func (s *kvs2kvc) DeleteRange(ctx context.Context, in *pb.DeleteRangeRequest, opts ...grpc.CallOption) (*pb.DeleteRangeResponse, error) {
 	return s.kvs.DeleteRange(ctx, in)
 }

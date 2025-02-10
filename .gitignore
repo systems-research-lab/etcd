@@ -32,3 +32,5 @@ evaluation/**/*.log
 etcdctl/etcdctl
 etcdutl/utl
 server/server
+
+exec.sh

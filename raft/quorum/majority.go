@@ -170,7 +170,7 @@ func (c MajorityConfig) CommittedIndex(l AckedIndexer, quorum uint64) Index {
 	// updated by shireen
 	var pos int
 	if quorum == 0 {
-		pos = n - (n/2 + 1)
+		pos = n - ((2 * n / 3) + 1)
 		fmt.Sprintf("default quorum pos %[1]d\n", pos)
 	} else {
 		pos = n - int(quorum)
@@ -208,7 +208,7 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 	}
 	var q int
 	if quorum == 0 {
-		q = len(c)/2 + 1
+		q = ((2 * len(c)) / 3) + 1
 		fmt.Sprintf("variable quorum votesresult %[1]d\n", q)
 	} else {
 		q = int(quorum)

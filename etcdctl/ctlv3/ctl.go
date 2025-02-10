@@ -74,6 +74,7 @@ func init() {
 	rootCmd.AddCommand(
 		command.NewGetCommand(),
 		command.NewPutCommand(),
+		command.NewPutpCommand(),
 		command.NewDelCommand(),
 		command.NewTxnCommand(),
 		command.NewCompactionCommand(),

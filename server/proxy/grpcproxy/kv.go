@@ -18,7 +18,7 @@ import (
 	"context"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
-	"go.etcd.io/etcd/client/v3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/proxy/grpcproxy/cache"
 )
 
@@ -73,6 +73,10 @@ func (p *kvProxy) Put(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, e
 
 	resp, err := p.kv.Do(ctx, PutRequestToOp(r))
 	return (*pb.PutResponse)(resp.Put()), err
+}
+
+func (p *kvProxy) PutP(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, error) {
+	return p.Put(ctx, r)
 }
 
 func (p *kvProxy) DeleteRange(ctx context.Context, r *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error) {

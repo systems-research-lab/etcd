@@ -37,6 +37,8 @@ type KV interface {
 	// To get a string of bytes, do string([]byte{0x10, 0x20}).
 	Put(ctx context.Context, key, val string, opts ...OpOption) (*PutResponse, error)
 
+	PutP(ctx context.Context, key, val string, opts ...OpOption) (*PutResponse, error)
+
 	// Get retrieves keys.
 	// By default, Get will return the value for "key", if any.
 	// When passed WithRange(end), Get will return the keys in the range [key, end).
@@ -113,6 +115,10 @@ func NewKVFromKVClient(remote pb.KVClient, c *Client) KV {
 func (kv *kv) Put(ctx context.Context, key, val string, opts ...OpOption) (*PutResponse, error) {
 	r, err := kv.Do(ctx, OpPut(key, val, opts...))
 	return r.put, toErr(ctx, err)
+}
+
+func (kv *kv) PutP(ctx context.Context, key, val string, opts ...OpOption) (*PutResponse, error) {
+	return kv.Put(ctx, key, val, opts...)
 }
 
 func (kv *kv) Get(ctx context.Context, key string, opts ...OpOption) (*GetResponse, error) {

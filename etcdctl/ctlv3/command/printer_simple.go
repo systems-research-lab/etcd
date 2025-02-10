@@ -49,6 +49,10 @@ func (s *simplePrinter) Put(r v3.PutResponse) {
 	}
 }
 
+func (s *simplePrinter) PutP(r v3.PutResponse) {
+	s.Put(r)
+}
+
 func (s *simplePrinter) Txn(resp v3.TxnResponse) {
 	if resp.Succeeded {
 		fmt.Println("SUCCESS")

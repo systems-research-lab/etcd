@@ -20,7 +20,7 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
-	"go.etcd.io/etcd/client/v3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/pkg/v3/cobrautl"
 )
 
@@ -62,6 +62,28 @@ will store the content of the file to <key>.
 	cmd.Flags().BoolVar(&putIgnoreVal, "ignore-value", false, "updates the key using its current value")
 	cmd.Flags().BoolVar(&putIgnoreLease, "ignore-lease", false, "updates the key using its current lease")
 	return cmd
+}
+
+func NewPutpCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "putp [options] <key> <value>",
+		Short: "Puts the given key into the store using putp",
+		Run:   putpCommandFunc,
+	}
+	// Add any flags if needed
+	return cmd
+}
+
+func putpCommandFunc(cmd *cobra.Command, args []string) {
+	key, value, opts := getPutOp(args)
+
+	ctx, cancel := commandCtx(cmd)
+	resp, err := mustClientFromCmd(cmd).PutP(ctx, key, value, opts...)
+	cancel()
+	if err != nil {
+		cobrautl.ExitWithError(cobrautl.ExitError, err)
+	}
+	display.PutP(*resp)
 }
 
 // putCommandFunc executes the "put" command.

@@ -109,6 +109,10 @@ func (rkv *retryKVClient) Put(ctx context.Context, in *pb.PutRequest, opts ...gr
 	return rkv.kc.Put(ctx, in, opts...)
 }
 
+func (rkv *retryKVClient) PutP(ctx context.Context, in *pb.PutRequest, opts ...grpc.CallOption) (resp *pb.PutResponse, err error) {
+	return rkv.Put(ctx, in, opts...)
+}
+
 func (rkv *retryKVClient) DeleteRange(ctx context.Context, in *pb.DeleteRangeRequest, opts ...grpc.CallOption) (resp *pb.DeleteRangeResponse, err error) {
 	return rkv.kc.DeleteRange(ctx, in, opts...)
 }

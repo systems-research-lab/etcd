@@ -31,6 +31,7 @@ type printer interface {
 	Del(v3.DeleteResponse)
 	Get(v3.GetResponse)
 	Put(v3.PutResponse)
+	PutP(v3.PutResponse)
 	Txn(v3.TxnResponse)
 	Watch(v3.WatchResponse)
 
@@ -95,6 +96,7 @@ type printerRPC struct {
 func (p *printerRPC) Del(r v3.DeleteResponse)  { p.p((*pb.DeleteRangeResponse)(&r)) }
 func (p *printerRPC) Get(r v3.GetResponse)     { p.p((*pb.RangeResponse)(&r)) }
 func (p *printerRPC) Put(r v3.PutResponse)     { p.p((*pb.PutResponse)(&r)) }
+func (p *printerRPC) PutP(r v3.PutResponse)    { p.p((*pb.PutResponse)(&r)) }
 func (p *printerRPC) Txn(r v3.TxnResponse)     { p.p((*pb.TxnResponse)(&r)) }
 func (p *printerRPC) Watch(r v3.WatchResponse) { p.p(&r) }
 
