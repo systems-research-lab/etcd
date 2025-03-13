@@ -21,7 +21,7 @@ import (
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/client/pkg/v3/types"
-	"go.etcd.io/etcd/client/v3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/etcdserver"
 	"go.etcd.io/etcd/server/v3/etcdserver/api"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
@@ -103,7 +103,7 @@ func (s *v2v3Server) MergeMember(ctx context.Context, r pb.MemberMergeRequest) (
 	panic("unimplemented!")
 }
 
-func (s *v2v3Server) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error) {
+func (s *v2v3Server) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64, mode string) ([]*membership.Member, error) {
 	panic("unimplemented!")
 }
 

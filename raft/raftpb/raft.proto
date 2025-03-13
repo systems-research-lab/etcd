@@ -144,6 +144,8 @@ enum ConfChangeTransition {
 	ConfChangeTransitionMergeEnter = 9;
 	// Enter joint consensus for merge
 	ConfChangeTransitionMergeLeave = 10;
+	// Enter Recraft joint consensus
+	ConfChangeTransitionJointRecraft = 11;
 }
 
 message ConfState {

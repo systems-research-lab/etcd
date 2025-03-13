@@ -17,13 +17,14 @@ package command
 import (
 	"errors"
 	"fmt"
-	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"log"
 	"strconv"
 	"strings"
 
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
+
 	"github.com/spf13/cobra"
-	"go.etcd.io/etcd/client/v3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/pkg/v3/cobrautl"
 )
 
@@ -34,6 +35,7 @@ var (
 	leave          bool
 	add            string
 	remove         string
+	mode           string
 )
 
 // NewMemberCommand returns the cobra command for "member".
@@ -160,9 +162,9 @@ func NewMemberMergeCommand() *cobra.Command {
 // NewMemberJointCommand returns the cobra command for "member joint".
 func NewMemberJointCommand() *cobra.Command {
 	cc := &cobra.Command{
-		Use:   "joint --add <memberPeerUrls> --remove <memberIDs>",
-		Short: "Add or remove members with joint consensus",
-		Long: `Add or remove members with joint consensus 
+		Use:   "joint --add <memberPeerUrls> --remove <memberIDs> --mode <mode>",
+		Short: "Add or remove members with joint or recraft consensus",
+		Long: `Add or remove members with joint or recraft consensus 
 `,
 
 		Run: memberJointCommandFunc,
@@ -170,6 +172,7 @@ func NewMemberJointCommand() *cobra.Command {
 
 	cc.Flags().StringVar(&add, "add", "", "comma seperated urls for nodes to add, one peer url for one node")
 	cc.Flags().StringVar(&remove, "remove", "", "comma seperated IDs for nodes to remove")
+	cc.Flags().StringVar(&mode, "mode", "raft", "joint consensus mode, one of 'raft' or 'recraft'")
 
 	return cc
 }
@@ -394,6 +397,10 @@ func memberMergeCommandFunc(cmd *cobra.Command, args []string) {
 
 func memberJointCommandFunc(cmd *cobra.Command, args []string) {
 	//	cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("not members provided"))
+
+	// fmt.Println("Inside memberJointCommandFunc")
+	// fmt.Println(mode)
+
 	if len(add) == 0 && len(remove) == 0 {
 		cobrautl.ExitWithError(cobrautl.ExitBadArgs, fmt.Errorf("not members provided"))
 	}
@@ -415,7 +422,7 @@ func memberJointCommandFunc(cmd *cobra.Command, args []string) {
 	}
 
 	ctx, cancel := commandCtx(cmd)
-	_, err := mustClientFromCmd(cmd).MemberJoint(ctx, addUrls, removeIds)
+	_, err := mustClientFromCmd(cmd).MemberJoint(ctx, addUrls, removeIds, mode)
 	cancel()
 	if err != nil {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)
@@ -424,7 +431,7 @@ func memberJointCommandFunc(cmd *cobra.Command, args []string) {
 
 func memberLeaveJointCommandFunc(cmd *cobra.Command, args []string) {
 	ctx, cancel := commandCtx(cmd)
-	_, err := mustClientFromCmd(cmd).MemberJoint(ctx, nil, nil)
+	_, err := mustClientFromCmd(cmd).MemberJoint(ctx, nil, nil, mode)
 	cancel()
 	if err != nil {
 		cobrautl.ExitWithError(cobrautl.ExitError, err)

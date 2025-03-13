@@ -16,6 +16,7 @@ package clientv3
 
 import (
 	"context"
+	"fmt"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/client/pkg/v3/types"
@@ -58,7 +59,7 @@ type Cluster interface {
 
 	MemberMerge(ctx context.Context, clusters map[uint64]pb.MemberList) (*MemberMergeResponse, error)
 
-	MemberJoint(ctx context.Context, addPeersAddr []string, removePeersId []uint64) (*MemberJointResponse, error)
+	MemberJoint(ctx context.Context, addPeersAddr []string, removePeersId []uint64, mode string) (*MemberJointResponse, error)
 
 	MemberLeaveJoint(ctx context.Context) (*MemberJointResponse, error)
 }
@@ -169,8 +170,11 @@ func (c *cluster) MemberMerge(ctx context.Context, clusters map[uint64]pb.Member
 	return (*MemberMergeResponse)(resp), nil
 }
 
-func (c *cluster) MemberJoint(ctx context.Context, addPeersAddr []string, removePeersId []uint64) (*MemberJointResponse, error) {
-	r := &pb.MemberJointRequest{AddPeersUrl: addPeersAddr, RemovePeersId: removePeersId}
+func (c *cluster) MemberJoint(ctx context.Context, addPeersAddr []string, removePeersId []uint64, mode string) (*MemberJointResponse, error) {
+	// fmt.Println("MemberJoint")
+	// fmt.Println(mode)
+	r := &pb.MemberJointRequest{AddPeersUrl: addPeersAddr, RemovePeersId: removePeersId, Mode: mode}
+	fmt.Print(r)
 	resp, err := c.remote.MemberJoint(ctx, r, c.callOpts...)
 	if err != nil {
 		return nil, toErr(ctx, err)

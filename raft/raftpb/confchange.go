@@ -100,6 +100,10 @@ func (c ConfChangeV2) EnterJoint() (autoLeave bool, ok bool) {
 	return false, false
 }
 
+func (c ConfChangeV2) EnterRecraftJoint() bool {
+	return c.Transition == ConfChangeTransitionJointRecraft
+}
+
 func (c ConfChangeV2) LeaveJoint() bool {
 	return c.Transition == ConfChangeTransitionJointLeave
 }

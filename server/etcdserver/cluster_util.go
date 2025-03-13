@@ -73,11 +73,13 @@ func getClusterFromRemotePeers(lg *zap.Logger, urls []string, timeout time.Durat
 	}
 	for _, u := range urls {
 		addr := u + "/members"
+		fmt.Println(addr)
 		resp, err := cc.Get(addr)
 		if err != nil {
 			if logerr {
 				lg.Warn("failed to get cluster response", zap.String("address", addr), zap.Error(err))
 			}
+			lg.Warn("failed to get cluster response", zap.String("address", addr), zap.Error(err))
 			continue
 		}
 		b, err := ioutil.ReadAll(resp.Body)
@@ -107,6 +109,8 @@ func getClusterFromRemotePeers(lg *zap.Logger, urls []string, timeout time.Durat
 			}
 			continue
 		}
+
+		fmt.Println(membs)
 
 		// check the length of membership members
 		// if the membership members are present then prepare and return raft cluster

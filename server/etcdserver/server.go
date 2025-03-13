@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"go.etcd.io/etcd/pkg/v3/measure"
 	"log"
 	"math"
 	"math/rand"
@@ -34,6 +33,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.etcd.io/etcd/pkg/v3/measure"
 
 	"github.com/coreos/go-semver/semver"
 	humanize "github.com/dustin/go-humanize"
@@ -121,6 +122,7 @@ var (
 	mergeId       = uint64(0)
 	splitId       = uint64(0)
 	splitEnterIdx = uint64(0)
+	jointEnterIdx = uint64(0)
 )
 
 func init() {
@@ -184,7 +186,7 @@ type Server interface {
 
 	MergeMember(ctx context.Context, r pb.MemberMergeRequest) ([]membership.Member, error)
 
-	JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error)
+	JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64, mode string) ([]*membership.Member, error)
 
 	// ClusterVersion is the cluster-wide minimum major.minor version.
 	// Cluster version is set to the min version that an etcd member is
@@ -435,6 +437,8 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 			return nil, err
 		}
 		existingCluster, gerr := GetClusterFromRemotePeers(cfg.Logger, getRemotePeerURLs(cl, cfg.Name), prt)
+		fmt.Println(existingCluster)
+		fmt.Println("Okay")
 		if gerr != nil {
 			return nil, fmt.Errorf("cannot fetch cluster info from peer urls: %v", gerr)
 		}
@@ -1581,7 +1585,9 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 		cc.Transition != raftpb.ConfChangeTransitionSplitImplicit &&
 		cc.Transition != raftpb.ConfChangeTransitionSplitExplicit &&
 		cc.Transition != raftpb.ConfChangeTransitionSplitLeave &&
-		cc.Transition != raftpb.ConfChangeTransitionMergeLeave {
+		cc.Transition != raftpb.ConfChangeTransitionMergeLeave &&
+		cc.Transition != raftpb.ConfChangeTransitionJointRecraft &&
+		cc.Transition != raftpb.ConfChangeTransitionJointExplicit {
 		s.lg.Warn("unsupported conf change v1 type", zap.Stringer("type", entry.Type))
 		return
 	}
@@ -1620,6 +1626,20 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 			}
 
 		case raftpb.ConfChangeTransitionJointLeave:
+			if cc.Changes == nil { // Explicit leave joint
+				fmt.Println("Hello\n")
+				fmt.Println(jointEnterIdx)
+				jointEntries, _ := s.r.raftStorage.Entries(jointEnterIdx, jointEnterIdx+1, math.MaxUint64)
+				jointEntry := jointEntries[0]
+				fmt.Println(jointEntry)
+				var ccv2 raftpb.ConfChangeV2
+				if err := ccv2.Unmarshal(jointEntry.Data); err != nil {
+					panic("unmarshal enter joint entry failed: " + err.Error())
+				}
+				fmt.Println(ccv2)
+				fmt.Println(ccv2.Changes)
+				cc.Changes = ccv2.Changes
+			}
 			for _, change := range cc.Changes {
 				id := types.ID(change.NodeID)
 				if change.Type == raftpb.ConfChangeRemoveNode {
@@ -1660,6 +1680,10 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 	s.lg.Debug("conf change v2 entry appended", zap.String("conf-change-entry-identifier", ccid))
 
 	confState = *s.r.ApplyConfChange(cc)
+
+	fmt.Println("hey hey hey")
+	fmt.Println(cc.Transition)
+
 	switch cc.Transition {
 	case raftpb.ConfChangeTransitionSplitLeave:
 		if len(confState.VotersOutgoing) != 0 {
@@ -1668,8 +1692,9 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 	case raftpb.ConfChangeTransitionSplitExplicit:
 		splitEnterIdx = entry.Index
 
-	case raftpb.ConfChangeTransitionJointImplicit:
+	case raftpb.ConfChangeTransitionJointImplicit, raftpb.ConfChangeTransitionJointExplicit, raftpb.ConfChangeTransitionJointRecraft:
 		splitEnterIdx = entry.Index
+		jointEnterIdx = entry.Index
 
 		if len(confState.VotersOutgoing) == 0 {
 			panic("Not in joint consensus! ConfState: " + confState.String())
@@ -1697,6 +1722,26 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 
 				s.r.transport.AddPeer(mem.ID, mem.PeerURLs)
 			}
+			// if change.Type == raftpb.ConfChangeRemoveNode {
+			// 	// if !s.cluster.IsMemberExist(types.ID(change.NodeID)) {
+			// 	// 	s.cluster.RemoveMember(types.ID(change.NodeID), membership.ApplyBoth)
+			// 	// 	if s.id != types.ID(change.NodeID) {
+			// 	// 		s.r.transport.RemovePeer(types.ID(change.NodeID))
+			// 	// 	}
+			// 	// }
+			// 	id := types.ID(change.NodeID)
+			// 	// if !s.cluster.IsMemberExist(id) {
+			// 	// 	panic("remove member not exist: " + id.String())
+			// 	// }
+			// 	// s.cluster.RemoveMember(id, membership.ApplyBoth)
+
+			// 	if s.id == id {
+			// 		shouldStop = true
+			// 	} else {
+			// 		s.r.transport.Send([]raftpb.Message{{From: uint64(s.cluster.ID()), To: uint64(id), Type: raftpb.MsgShutdown}})
+			// 		s.r.transport.RemovePeer(id)
+			// 	}
+			// }
 		}
 
 		triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
@@ -2086,11 +2131,14 @@ func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) (
 	}
 }
 
-func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64) ([]*membership.Member, error) {
-	log.Print(addMembs == nil)
-	log.Print(removeMembs == nil)
+func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64, mode string) ([]*membership.Member, error) {
+	log.Println("Inside server.go/JointMember")
+	log.Println(mode)
+	log.Println(addMembs == nil)
+	log.Println(removeMembs == nil)
+
 	if addMembs == nil && removeMembs == nil {
-		log.Print("leave joint here")
+		log.Println("leave joint here")
 		id := s.reqIDGen.Next()
 		start := time.Now()
 		//log.Print("leave joint")
@@ -2101,9 +2149,18 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 
 			return nil, err
 		}
-		log.Print("LEAVE JOINT ", time.Since(start))
+		log.Println("LEAVE JOINT ", time.Since(start))
 		return nil, nil
 	}
+
+	// Nold := len(s.cluster.Members())
+	// Qold := Nold/2 + 1
+	// if removeMembs != nil {
+	// 	if len(removeMembs) >= Qold {
+	// 		return nil, fmt.Errorf("removing too many members: %d", len(removeMembs))
+	// 	}
+	// }
+
 	changes := make([]raftpb.ConfChangeSingle, 0, len(addMembs)+len(removeMembs))
 	for _, mem := range addMembs {
 		if s.cluster.IsMemberExist(mem.ID) {
@@ -2137,8 +2194,16 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 	id := s.reqIDGen.Next()
 	ch := s.w.Register(id)
 
+	var transition raftpb.ConfChangeTransition
+
+	if mode == "recraft" {
+		transition = raftpb.ConfChangeTransitionJointRecraft
+	} else {
+		transition = raftpb.ConfChangeTransitionJointExplicit
+	}
+
 	cc := raftpb.ConfChangeV2{
-		Transition: raftpb.ConfChangeTransitionJointImplicit,
+		Transition: transition,
 		Changes:    changes,
 		Context:    []byte(strconv.FormatUint(id, 10)),
 	}
@@ -2156,6 +2221,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 		if x == nil {
 			lg.Panic("failed to configure")
 		}
+		fmt.Print("Applied")
 		resp := x.(*confChangeResponse)
 		lg.Info(
 			"applied a joint configuration change through raft",
@@ -2165,11 +2231,13 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 		return resp.membs, resp.err
 
 	case <-ctx.Done():
+		fmt.Print("Done")
 		log.Print(time.Since(start))
 		s.w.Trigger(id, nil) // GC wait
 		return nil, s.parseProposeCtxErr(ctx.Err(), start)
 
 	case <-s.stopping:
+		fmt.Print("Stopping")
 		return nil, ErrStopped
 	}
 }

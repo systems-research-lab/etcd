@@ -490,6 +490,7 @@ func (r *raftNode) advanceTicks(ticks int) {
 
 func startNode(cfg config.ServerConfig, cl *membership.RaftCluster, ids []types.ID) (id types.ID, n raft.Node, s *raft.MemoryStorage, w *wal.WAL) {
 	var err error
+	fmt.Println("cfg:", cfg)
 	member := cl.MemberByName(cfg.Name)
 	metadata := pbutil.MustMarshal(
 		&pb.Metadata{
@@ -503,6 +504,7 @@ func startNode(cfg config.ServerConfig, cl *membership.RaftCluster, ids []types.
 	if cfg.UnsafeNoFsync {
 		w.SetUnsafeNoFsync()
 	}
+	fmt.Println("ids:", ids)
 	peers := make([]raft.Peer, len(ids))
 	for i, id := range ids {
 		var ctx []byte
@@ -512,6 +514,7 @@ func startNode(cfg config.ServerConfig, cl *membership.RaftCluster, ids []types.
 		}
 		peers[i] = raft.Peer{ID: uint64(id), Context: ctx}
 	}
+	fmt.Println("peers:", peers)
 	id = member.ID
 	cfg.Logger.Info(
 		"starting local member",

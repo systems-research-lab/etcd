@@ -17,7 +17,6 @@ package confchange
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -52,6 +51,8 @@ type Changer struct {
 //
 // [1]: https://github.com/ongardie/dissertation/blob/master/online-trim.pdf
 func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.ProgressMap, error) {
+	fmt.Println("EnterJoint")
+
 	cfg, prs, err := c.checkAndCopy()
 	if err != nil {
 		return c.err(err)
@@ -76,22 +77,72 @@ func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker
 	if err := c.apply(&cfg, prs, ccs...); err != nil {
 		return c.err(err)
 	}
-	log.Print(cfg.Voters)
-	log.Printf("confchange")
-	log.Print(cfg.Voters)
-	var Qold = len(cfg.Voters[0])/2 + 1
-	var Nold = len(cfg.Voters[0])
-	var n = int(len(cfg.Voters[0]) - len(cfg.Voters[1]))
-	var q_r = Nold + n - Qold + 1
+
+	cfg.AutoLeave = autoLeave
+
+	return checkAndReturn(cfg, prs)
+}
+
+func (c Changer) EnterRecraftJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.ProgressMap, error) {
+	fmt.Println("EnterRecraftJoint")
+	cfg, prs, err := c.checkAndCopy()
+	if err != nil {
+		return c.err(err)
+	}
+	if joint(cfg) {
+		err := errors.New("config is already joint")
+		return c.err(err)
+	}
+	if len(incoming(cfg.Voters)) == 0 {
+		// We allow adding nodes to an empty config for convenience (testing and
+		// bootstrap), but you can't enter a joint state.
+		err := errors.New("can't make a zero-voter config joint")
+		return c.err(err)
+	}
+	// Clear the outgoing config.
+	*outgoingPtr(&cfg.Voters) = quorum.MajorityConfig{}
+	// Copy incoming to outgoing.
+	for id := range incoming(cfg.Voters) {
+		outgoing(cfg.Voters)[id] = struct{}{}
+	}
+
+	if err := c.apply(&cfg, prs, ccs...); err != nil {
+		return c.err(err)
+	}
+
+	n := int(len(cfg.Voters[0]) - len(cfg.Voters[1]))
+
+	var q_r int
+	var Qold = len(cfg.Voters[1])/2 + 1
+	var Nold = len(cfg.Voters[1])
+	var Qnew = len(cfg.Voters[0])/2 + 1
+
+	fmt.Println("Nold: ", Nold)
+	fmt.Println("Qold: ", Qold)
+	fmt.Println("Qnew: ", Qnew)
+
+	if n > 0 { // Add new nodes
+		fmt.Println("Add q_r")
+		q_r = Nold + n - Qold + 1
+	} else if n < 0 { // Remove nodes
+		fmt.Println("Remove q_r")
+		q_r = Nold - Qnew + 1
+	} else {
+		// TODO: Handle the case when n = 0
+	}
+
+	fmt.Println("q_r: ", q_r)
+
 	var q_m = len(cfg.Voters[0])/2 + 1
-	log.Print(q_r)
-	log.Print(q_m)
+
+	fmt.Println("q_m: ", q_m)
+
 	if q_r == q_m {
-		log.Print("set autoleave")
 		cfg.AutoLeave = autoLeave
 	}
 
-	//cfg.AutoLeave = autoLeave
+	cfg.RJoint = true
+
 	return checkAndReturn(cfg, prs)
 }
 
@@ -110,6 +161,8 @@ func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker
 //
 // [1]: https://github.com/ongardie/dissertation/blob/master/online-trim.pdf
 func (c Changer) LeaveJoint() (tracker.Config, tracker.ProgressMap, error) {
+
+	fmt.Println("LeaveJoint")
 	cfg, prs, err := c.checkAndCopy()
 	if err != nil {
 		return c.err(err)
@@ -138,6 +191,9 @@ func (c Changer) LeaveJoint() (tracker.Config, tracker.ProgressMap, error) {
 	}
 	*outgoingPtr(&cfg.Voters) = nil
 	cfg.AutoLeave = false
+	if cfg.RJoint {
+		cfg.RJoint = false
+	}
 
 	return checkAndReturn(cfg, prs)
 }
@@ -372,11 +428,14 @@ func (c Changer) makeVoter(cfg *tracker.Config, prs tracker.ProgressMap, id uint
 		c.initProgress(cfg, prs, id, false /* isLearner */)
 		return
 	}
+	fmt.Println("makeVoter")
+	fmt.Println(pr)
 
 	pr.IsLearner = false
 	nilAwareDelete(&cfg.Learners, id)
 	nilAwareDelete(&cfg.LearnersNext, id)
 	incoming(cfg.Voters)[id] = struct{}{}
+	fmt.Println(incoming(cfg.Voters))
 }
 
 // makeLearner makes the given ID a learner or stages it to be a learner once

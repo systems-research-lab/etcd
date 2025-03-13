@@ -808,6 +808,9 @@ func downgradeInfoFromBackend(lg *zap.Logger, be backend.Backend) *DowngradeInfo
 func ValidateClusterAndAssignIDs(lg *zap.Logger, local *RaftCluster, existing *RaftCluster) error {
 	ems := existing.Members()
 	lms := local.Members()
+	fmt.Println("Bye")
+	fmt.Println(ems)
+	fmt.Println(lms)
 	if len(ems) != len(lms) {
 		return fmt.Errorf("member count is unequal")
 	}
@@ -824,6 +827,7 @@ func ValidateClusterAndAssignIDs(lg *zap.Logger, local *RaftCluster, existing *R
 			}
 		}
 		if !ok {
+			fmt.Println("no match found for existing member")
 			return fmt.Errorf("PeerURLs: no match found for existing member (%v, %v), last resolver error (%v)", ems[i].ID, ems[i].PeerURLs, err)
 		}
 	}

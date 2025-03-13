@@ -82,6 +82,9 @@ type Config struct {
 
 	//added by shireen for configuration change
 	Quorum uint64
+
+	// RJoint is true if the configuration is Recraft joint configuration.
+	RJoint bool
 }
 
 func (c Config) String() string {
@@ -243,7 +246,7 @@ func (p *ProgressTracker) QuorumActive(q uint64) bool {
 		votes[id] = pr.RecentActive
 	})
 
-	return p.Voters.VoteResult(votes, q) == quorum.VoteWon
+	return p.Voters.VoteResult(votes, q, p.Config.RJoint) == quorum.VoteWon
 }
 
 // VoterNodes returns a sorted slice of voters.
@@ -305,6 +308,6 @@ func (p *ProgressTracker) TallyVotes(q uint64) (granted int, rejected int, _ quo
 			rejected++
 		}
 	}
-	result := p.Voters.VoteResult(p.Votes, q)
+	result := p.Voters.VoteResult(p.Votes, q, p.Config.RJoint)
 	return granted, rejected, result
 }

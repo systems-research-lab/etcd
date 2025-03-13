@@ -988,6 +988,8 @@ message MemberMergeResponse {
 message MemberJointRequest {
   repeated string addPeersUrl = 1 [(gogoproto.nullable) = false];
   repeated uint64 removePeersId = 2 [(gogoproto.nullable) = false];
+  // mode specifies the mode of the joint consensus.
+  string mode = 3;
 }
 
 message MemberJointResponse {
