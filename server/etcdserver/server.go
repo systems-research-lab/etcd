@@ -437,8 +437,8 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 			return nil, err
 		}
 		existingCluster, gerr := GetClusterFromRemotePeers(cfg.Logger, getRemotePeerURLs(cl, cfg.Name), prt)
-		fmt.Println(existingCluster)
-		fmt.Println("Okay")
+		// fmt.Println(existingCluster)
+		// fmt.Println("Okay")
 		if gerr != nil {
 			return nil, fmt.Errorf("cannot fetch cluster info from peer urls: %v", gerr)
 		}
@@ -1627,17 +1627,17 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 
 		case raftpb.ConfChangeTransitionJointLeave:
 			if cc.Changes == nil { // Explicit leave joint
-				fmt.Println("Hello\n")
-				fmt.Println(jointEnterIdx)
+				// fmt.Println("Hello\n")
+				// fmt.Println(jointEnterIdx)
 				jointEntries, _ := s.r.raftStorage.Entries(jointEnterIdx, jointEnterIdx+1, math.MaxUint64)
 				jointEntry := jointEntries[0]
-				fmt.Println(jointEntry)
+				// fmt.Println(jointEntry)
 				var ccv2 raftpb.ConfChangeV2
 				if err := ccv2.Unmarshal(jointEntry.Data); err != nil {
 					panic("unmarshal enter joint entry failed: " + err.Error())
 				}
-				fmt.Println(ccv2)
-				fmt.Println(ccv2.Changes)
+				// fmt.Println(ccv2)
+				// fmt.Println(ccv2.Changes)
 				cc.Changes = ccv2.Changes
 			}
 			for _, change := range cc.Changes {
@@ -1681,8 +1681,8 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 
 	confState = *s.r.ApplyConfChange(cc)
 
-	fmt.Println("hey hey hey")
-	fmt.Println(cc.Transition)
+	// fmt.Println("hey hey hey")
+	// fmt.Println(cc.Transition)
 
 	switch cc.Transition {
 	case raftpb.ConfChangeTransitionSplitLeave:
@@ -1722,26 +1722,6 @@ func (s *EtcdServer) applyConfChangeV2(entry raftpb.Entry) (shouldStop bool) {
 
 				s.r.transport.AddPeer(mem.ID, mem.PeerURLs)
 			}
-			// if change.Type == raftpb.ConfChangeRemoveNode {
-			// 	// if !s.cluster.IsMemberExist(types.ID(change.NodeID)) {
-			// 	// 	s.cluster.RemoveMember(types.ID(change.NodeID), membership.ApplyBoth)
-			// 	// 	if s.id != types.ID(change.NodeID) {
-			// 	// 		s.r.transport.RemovePeer(types.ID(change.NodeID))
-			// 	// 	}
-			// 	// }
-			// 	id := types.ID(change.NodeID)
-			// 	// if !s.cluster.IsMemberExist(id) {
-			// 	// 	panic("remove member not exist: " + id.String())
-			// 	// }
-			// 	// s.cluster.RemoveMember(id, membership.ApplyBoth)
-
-			// 	if s.id == id {
-			// 		shouldStop = true
-			// 	} else {
-			// 		s.r.transport.Send([]raftpb.Message{{From: uint64(s.cluster.ID()), To: uint64(id), Type: raftpb.MsgShutdown}})
-			// 		s.r.transport.RemovePeer(id)
-			// 	}
-			// }
 		}
 
 		triggerId, err := strconv.ParseUint(string(cc.Context), 10, 64)
@@ -2132,13 +2112,13 @@ func (s *EtcdServer) MergeMember(ctx context.Context, r pb.MemberMergeRequest) (
 }
 
 func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Member, removeMembs []uint64, mode string) ([]*membership.Member, error) {
-	log.Println("Inside server.go/JointMember")
-	log.Println(mode)
-	log.Println(addMembs == nil)
-	log.Println(removeMembs == nil)
+	// log.Println("Inside server.go/JointMember")
+	// log.Println(mode)
+	// log.Println(addMembs == nil)
+	// log.Println(removeMembs == nil)
 
 	if addMembs == nil && removeMembs == nil {
-		log.Println("leave joint here")
+		// log.Println("leave joint here")
 		id := s.reqIDGen.Next()
 		start := time.Now()
 		//log.Print("leave joint")
@@ -2221,7 +2201,7 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 		if x == nil {
 			lg.Panic("failed to configure")
 		}
-		fmt.Print("Applied")
+		// fmt.Print("Applied")
 		resp := x.(*confChangeResponse)
 		lg.Info(
 			"applied a joint configuration change through raft",
@@ -2231,13 +2211,13 @@ func (s *EtcdServer) JointMember(ctx context.Context, addMembs []membership.Memb
 		return resp.membs, resp.err
 
 	case <-ctx.Done():
-		fmt.Print("Done")
+		// fmt.Print("Done")
 		log.Print(time.Since(start))
 		s.w.Trigger(id, nil) // GC wait
 		return nil, s.parseProposeCtxErr(ctx.Err(), start)
 
 	case <-s.stopping:
-		fmt.Print("Stopping")
+		// fmt.Print("Stopping")
 		return nil, ErrStopped
 	}
 }

@@ -1927,7 +1927,7 @@ func (r *raft) promotable() bool {
 }
 
 func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
-	fmt.Println("in applyConfChange")
+	// fmt.Println("in applyConfChange")
 	cfg, prs, err := func() (tracker.Config, tracker.ProgressMap, error) {
 		changer := confchange.Changer{
 			Tracker:   r.prs,
@@ -1935,16 +1935,16 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 			Quorum:    cc.Quorum,
 		}
 		if cc.LeaveJoint() {
-			fmt.Println("leave joint")
+			// fmt.Println("leave joint")
 			return changer.LeaveJoint()
 		} else if cc.EnterRecraftJoint() {
-			fmt.Println("enter recraft joint")
+			// fmt.Println("enter recraft joint")
 			return changer.EnterRecraftJoint(true, cc.Changes...)
 		} else if autoLeave, ok := cc.EnterJoint(); ok {
-			fmt.Println("enter joint")
+			// fmt.Println("enter joint")
 			return changer.EnterJoint(autoLeave, cc.Changes...)
 		} else if autoLeave, ok = cc.EnterSplit(); ok {
-			fmt.Println("enter split")
+			// fmt.Println("enter split")
 			measure.Update() <- measure.Measure{SplitEnter: measure.Time(time.Now())}
 			clrIdx, err := strconv.Atoi(string(cc.Context))
 			// if len(string(cc.Context)) == 0 {
@@ -1955,15 +1955,15 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 			}
 			return changer.EnterSplit(autoLeave, clrIdx, cc.Changes...)
 		} else if cc.LeaveSplit() {
-			fmt.Println("leave split")
+			// fmt.Println("leave split")
 			measure.Update() <- measure.Measure{SplitLeave: measure.Time(time.Now())}
 			return changer.LeaveSplit()
 		} else if autoLeave, ok = cc.EnterMerge(); ok {
-			fmt.Println("enter merge")
+			// fmt.Println("enter merge")
 			measure.Update() <- measure.Measure{MergeEnter: measure.Time(time.Now())}
 			return changer.EnterMerge(autoLeave, cc.Changes...)
 		} else if cc.LeaveMerge() {
-			fmt.Println("leave merge")
+			// fmt.Println("leave merge")
 			measure.Update() <- measure.Measure{MergeLeave: measure.Time(time.Now())}
 			return changer.LeaveMerge()
 		}

@@ -74,10 +74,10 @@ func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64, rjoint boo
 
 	if len(c[1]) > 0 { // Joint Configuration
 		if rjoint { // Recraft Joint Configuration
-			fmt.Println("Recraft Joint Configuration")
+			// fmt.Println("Recraft Joint Configuration")
 			return c.RecraftVoteResult(votes, quorum)
 		} else { // Raft Joint Configuration
-			fmt.Println("Raft Joint Configuration")
+			// fmt.Println("Raft Joint Configuration")
 			return c.RaftVoteResult(votes, quorum)
 		}
 	} else {
@@ -86,25 +86,25 @@ func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64, rjoint boo
 }
 
 func (c JointConfig) RecraftVoteResult(votes map[uint64]bool, quorum uint64) VoteResult {
-	fmt.Println("JointConfig.RecraftVoteResult")
+	// fmt.Println("JointConfig.RecraftVoteResult")
 	n := len(c[0]) - len(c[1])
-	fmt.Println("n:", n)
+	// fmt.Println("n:", n)
 	if n > 0 { // add
 		Nold := len(c[1])
 		Qold := len(c[1])/2 + 1
-		fmt.Println("Nold:", Nold)
-		fmt.Println("Qold:", Qold)
+		// fmt.Println("Nold:", Nold)
+		// fmt.Println("Qold:", Qold)
 		quorum = uint64(Nold + n - Qold + 1)
-		fmt.Println("quorum:", quorum)
+		// fmt.Println("quorum:", quorum)
 		return c[0].VoteResult(votes, quorum) // c[0] is the new config (contains all the voters)
 	} else if n < 0 { // remove
 		Nold := len(c[1])
 		// Qold := len(c[1])/2 + 1
 		Qnew := len(c[0])/2 + 1
-		fmt.Println("Nold:", Nold)
-		fmt.Println("Qnew:", Qnew)
+		// fmt.Println("Nold:", Nold)
+		// fmt.Println("Qnew:", Qnew)
 		quorum = uint64(Nold - Qnew + 1)
-		fmt.Println("quorum:", quorum)
+		// fmt.Println("quorum:", quorum)
 		return c[1].VoteResult(votes, quorum) // c[1] is the old config (contains all the voters)
 	} else {
 		// TODO: handle the case where the two configs are equal
@@ -113,7 +113,7 @@ func (c JointConfig) RecraftVoteResult(votes map[uint64]bool, quorum uint64) Vot
 }
 
 func (c JointConfig) RaftVoteResult(votes map[uint64]bool, quorum uint64) VoteResult {
-	fmt.Println("JointConfig.RaftVoteResult")
+	// fmt.Println("JointConfig.RaftVoteResult")
 	ret := VoteWon
 	for _, mc := range c {
 		r := mc.VoteResult(votes, quorum)

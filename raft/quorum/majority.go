@@ -198,7 +198,7 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 	for id := range c {
 		v, ok := votes[id]
 		if !ok {
-			fmt.Println("missing vote for id:", id)
+			// fmt.Println("missing vote for id:", id)
 			missing++
 			continue
 		}
@@ -209,17 +209,17 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 		}
 	}
 	var q int
-	fmt.Println(c)
-	fmt.Println(ny[0], ny[1])
-	fmt.Println(missing)
+	// fmt.Println(c)
+	// fmt.Println(ny[0], ny[1])
+	// fmt.Println(missing)
 	if quorum != 0 {
-		fmt.Println("quorum is not zero")
-		fmt.Printf("quorum is %[1]d\n", quorum)
+		// fmt.Println("quorum is not zero")
+		// fmt.Printf("quorum is %[1]d\n", quorum)
 		q = int(quorum)
 	} else {
 		q = len(c)/2 + 1
-		fmt.Println("quorum is zero")
-		fmt.Printf("quorum is %[1]d\n", q)
+		// fmt.Println("quorum is zero")
+		// fmt.Printf("quorum is %[1]d\n", q)
 		log.Print(q)
 	}
 	if ny[1] >= q {

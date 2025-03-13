@@ -16,7 +16,6 @@ package v3rpc
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
@@ -123,13 +122,13 @@ func (cs *ClusterServer) MemberMerge(ctx context.Context, r *pb.MemberMergeReque
 }
 
 func (cs *ClusterServer) MemberJoint(ctx context.Context, r *pb.MemberJointRequest) (*pb.MemberJointResponse, error) {
-	fmt.Println("Inside server MemberJoint")
-	fmt.Println(r)
+	// fmt.Println("Inside server MemberJoint")
+	// fmt.Println(r)
 	//var membs
 	if r.AddPeersUrl != nil && r.RemovePeersId != nil {
 		// TODO: Handle this case
 	} else if r.AddPeersUrl != nil {
-		fmt.Println("Add is not nil")
+		// fmt.Println("Add is not nil")
 		addMembs := make([]membership.Member, 0)
 		for _, url := range r.AddPeersUrl {
 			urls, err := types.NewURLs([]string{url})
@@ -146,14 +145,14 @@ func (cs *ClusterServer) MemberJoint(ctx context.Context, r *pb.MemberJointReque
 		}
 		return &pb.MemberJointResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
 	} else if r.RemovePeersId != nil {
-		fmt.Println("Remove is not nil")
+		// fmt.Println("Remove is not nil")
 		membs, err := cs.server.JointMember(ctx, nil, r.RemovePeersId, r.Mode)
 		if err != nil {
 			return nil, err
 		}
 		return &pb.MemberJointResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
 	} else {
-		fmt.Print("Both add and remove are nil")
+		// fmt.Print("Both add and remove are nil")
 		membs, err := cs.server.JointMember(ctx, nil, nil, r.Mode)
 		if err != nil {
 			return nil, err
