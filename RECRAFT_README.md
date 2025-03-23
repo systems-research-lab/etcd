@@ -37,6 +37,11 @@ pip3 show fabric requests
 
 ## Setting Up Your Environment
 
+### Install gobin
+```bash
+go install github.com/myitcv/gobin@latest
+```
+
 ### Add Go Binaries to PATH
 ```bash
 export PATH=$PATH:$(go env GOPATH)/bin
