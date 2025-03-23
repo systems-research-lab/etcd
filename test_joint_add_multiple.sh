@@ -25,7 +25,7 @@ echo "Retrieving value for key 'a'..."
 sleep 3
 
 # Join a new etcd member
-echo "Joining a new etcd member..."
+echo "Joining new etcd members..."
 ../bin/etcdctl member joint --add http://127.0.0.1:4380,http://127.0.0.1:5380 &
 sleep 10
 
@@ -80,11 +80,12 @@ echo "Retrieving value for key 'a' from node 5..."
 ../bin/etcdctl --endpoints=http://127.0.0.1:5380 get a &
 sleep 2
 
-# echo "Cleaning up cluster..."
-# ../clean_up.sh
-# sleep 10
+echo "Issuing leave joint..."
+../bin/etcdctl member leave joint &
+sleep 5
 
-# echo "Script execution completed."
+echo "Cleaning up cluster..."
+../clean_up.sh
+sleep 10
 
-# # ./bin/etcdctl --endpoints=http://127.0.0.1:4380 put c d
-# # ./bin/etcdctl member leave joint
+echo "Script execution completed."

@@ -364,13 +364,13 @@ func memberMergeCommandFunc(cmd *cobra.Command, args []string) {
 	urlStrs := strings.Split(args[0], ",")
 	clusters := map[uint64]etcdserverpb.MemberList{}
 	for _, url := range urlStrs {
-		log.Print(url)
+		// log.Print(url)
 		client, err := clientv3.New(clientv3.Config{Endpoints: []string{url}})
 		if err != nil {
 			cobrautl.ExitWithError(cobrautl.ExitBadArgs,
 				fmt.Errorf("cannot create client by url (%v): %v", url, err))
 		}
-		log.Print(client.MemberList(ctx))
+		// log.Print(client.MemberList(ctx))
 		resp, err := client.MemberList(ctx)
 		if err != nil {
 			log.Print("error 1")

@@ -34,14 +34,14 @@ sleep 2
 
 echo "Merging members from endpoints 2380 and 4380..."
 ../bin/etcdctl member merge http://127.0.0.1:2380,http://127.0.0.1:4380
-sleep 10
+sleep 15
 
-# echo "Verifying membership on endpoint 1380..."
-# ../bin/etcdctl --endpoints=http://127.0.0.1:1380 --write-out=table member list
+echo "Verifying membership on endpoint 1380..."
+../bin/etcdctl --endpoints=http://127.0.0.1:1380 --write-out=table member list
 
-# echo "Verifying membership on endpoint 4380..."
-# ../bin/etcdctl --endpoints=http://127.0.0.1:4380 --write-out=table member list
-# sleep 3
+echo "Verifying membership on endpoint 4380..."
+../bin/etcdctl --endpoints=http://127.0.0.1:4380 --write-out=table member list
+sleep 3
 
 echo "Getting key 'c' from endpoint 1380..."
 ../bin/etcdctl --endpoints=http://127.0.0.1:1380 get c
@@ -53,13 +53,6 @@ sleep 2
 echo "Splitting the cluster..."
 ../bin/etcdctl --endpoints=http://127.0.0.1:1380,http://127.0.0.1:2380,http://127.0.0.1:3380,http://127.0.0.1:4380,http://127.0.0.1:5380 member split 7ac641502b72a71a,b71f75320dc06a6c,d07d5325fff892c1 b7bacd4212cc9323,a100ada638d79265
 sleep 10
-
-echo "Verifying membership on endpoint 1380..."
-../bin/etcdctl --endpoints=http://127.0.0.1:1380 --write-out=table member list
-
-echo "Verifying membership on endpoint 5380..."
-../bin/etcdctl --endpoints=http://127.0.0.1:5380 --write-out=table member list
-sleep 3
 
 echo "Putting key 'e' with value 'f' on endpoint 1380..."
 ../bin/etcdctl --endpoints=http://127.0.0.1:1380 put e f
@@ -84,8 +77,8 @@ echo "Final validation: Getting key 'g' and 'a' from endpoint 4380..."
 ../bin/etcdctl --endpoints=http://127.0.0.1:4380 get g
 ../bin/etcdctl --endpoints=http://127.0.0.1:4380 get a
 
-# echo "Cleaning up cluster..."
-# ../clean_up.sh
-# sleep 5
+echo "Cleaning up cluster..."
+../clean_up.sh
+sleep 5
 
-# echo "Script execution completed successfully."
+echo "Script execution completed successfully."

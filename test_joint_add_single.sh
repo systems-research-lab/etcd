@@ -57,11 +57,12 @@ echo "Retrieving value for key 'a' from node 4..."
 ../bin/etcdctl --endpoints=http://127.0.0.1:4380 get a &
 sleep 2
 
-# echo "Cleaning up cluster..."
-# ../clean_up.sh
-# sleep 10
+echo "Issuing leave joint..."
+../bin/etcdctl member leave joint &
+sleep 5
+
+echo "Cleaning up cluster..."
+../clean_up.sh
+sleep 10
 
 echo "Script execution completed."
-
-# ./bin/etcdctl --endpoints=http://127.0.0.1:4380 put c d
-# ./bin/etcdctl member leave joint

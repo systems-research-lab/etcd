@@ -25,7 +25,7 @@ echo "Retrieving value for key 'a'..."
 sleep 3
 
 # Remove etcd members
-echo "Removing etcd members..."
+echo "Removing etcd member..."
 ../bin/etcdctl --endpoints=http://127.0.0.1:1380,http://127.0.0.1:2380,http://127.0.0.1:3380 member joint --remove d07d5325fff892c1 --mode recraft &
 sleep 10
 
@@ -34,31 +34,8 @@ echo "Listing updated etcd members..."
 ../bin/etcdctl --endpoints=http://127.0.0.1:1380 --write-out=table member list &
 sleep 5
 
-# # List etcd members after adding node 4
-# echo "Listing etcd members after adding node 4..."
-# ../bin/etcdctl --endpoints=http://127.0.0.1:4380 --write-out=table member list &
-# sleep 3
-
-# # Retrieve value for key "a" from node 4
-# echo "Retrieving value for key 'a' from node 4..."
-# ../bin/etcdctl --endpoints=http://127.0.0.1:4380 get a &
-# sleep 2
-
-# # List etcd members after adding node 5
-# echo "Listing etcd members after adding node 5..."
-# ../bin/etcdctl --endpoints=http://127.0.0.1:5380 --write-out=table member list &
-# sleep 3
-
-# # Retrieve value for key "a" from node 5
-# echo "Retrieving value for key 'a' from node 5..."
-# ../bin/etcdctl --endpoints=http://127.0.0.1:5380 get a &
-# sleep 2
-
-# # echo "Cleaning up cluster..."
-# # ../clean_up.sh
-# # sleep 10
+echo "Cleaning up cluster..."
+../clean_up.sh
+sleep 10
 
 echo "Script execution completed."
-
-# # ./bin/etcdctl --endpoints=http://127.0.0.1:4380 put c d
-# # ./bin/etcdctl member leave joint

@@ -16,7 +16,6 @@ package clientv3
 
 import (
 	"context"
-	"fmt"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/client/pkg/v3/types"
@@ -174,7 +173,7 @@ func (c *cluster) MemberJoint(ctx context.Context, addPeersAddr []string, remove
 	// fmt.Println("MemberJoint")
 	// fmt.Println(mode)
 	r := &pb.MemberJointRequest{AddPeersUrl: addPeersAddr, RemovePeersId: removePeersId, Mode: mode}
-	fmt.Print(r)
+	// fmt.Print(r)
 	resp, err := c.remote.MemberJoint(ctx, r, c.callOpts...)
 	if err != nil {
 		return nil, toErr(ctx, err)

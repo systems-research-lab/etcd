@@ -10,7 +10,7 @@ SSH_KEY_PATH = '/home/ubuntu/.ssh/id_rsa'
 REMOTE_ETCD_DIR = '~/etcd'
 REMOTE_SERVER_DIR = REMOTE_ETCD_DIR + '/server'
 
-LOCAL_ETCD_DIR = '/Users/navada/VSCode/etcd'
+LOCAL_ETCD_DIR = os.getenv('LOCAL_ETCD_DIR')
 LOCAL_SERVER_DIR = LOCAL_ETCD_DIR + '/server'
 
 HTTP_SCHEME = 'http://'
