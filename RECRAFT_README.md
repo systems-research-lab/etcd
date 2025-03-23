@@ -153,6 +153,7 @@ You can test the functionality of adding multiple nodes using the Recraft consen
 ```
 
 **Remove a Node:**
+
 First, get member IDs(HEX IDs) using:
 ```bash
 etcdctl --write-out=table member list
@@ -226,6 +227,7 @@ You can test the functionality of adding multiple nodes using the Raft joint con
 ```
 
 **Remove a Node:**
+
 First, get member IDs(HEX IDs) using:
 ```bash
 etcdctl --write-out=table member list
