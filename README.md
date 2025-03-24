@@ -1,210 +1,292 @@
-# etcd
+# ReCraft
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/etcd-io/etcd?style=flat-square)](https://goreportcard.com/report/github.com/etcd-io/etcd)
-[![Coverage](https://codecov.io/gh/etcd-io/etcd/branch/master/graph/badge.svg)](https://codecov.io/gh/etcd-io/etcd)
-[![Tests](https://github.com/etcd-io/etcd/actions/workflows/tests.yaml/badge.svg)](https://github.com/etcd-io/etcd/actions/workflows/tests.yaml)
-[![asset-transparency](https://github.com/etcd-io/etcd/actions/workflows/asset-transparency.yaml/badge.svg)](https://github.com/etcd-io/etcd/actions/workflows/asset-transparency.yaml)
-[![codeql-analysis](https://github.com/etcd-io/etcd/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/etcd-io/etcd/actions/workflows/codeql-analysis.yml)
-[![self-hosted-linux-arm64-graviton2-tests](https://github.com/etcd-io/etcd/actions/workflows/self-hosted-linux-arm64-graviton2-tests.yml/badge.svg)](https://github.com/etcd-io/etcd/actions/workflows/self-hosted-linux-arm64-graviton2-tests.yml)
-[![Docs](https://img.shields.io/badge/docs-latest-green.svg)](https://etcd.io/docs)
-[![Godoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/etcd-io/etcd)
-[![Releases](https://img.shields.io/github/release/etcd-io/etcd/all.svg?style=flat-square)](https://github.com/etcd-io/etcd/releases)
-[![LICENSE](https://img.shields.io/github/license/etcd-io/etcd.svg?style=flat-square)](https://github.com/etcd-io/etcd/blob/main/LICENSE)
+ReCraft is implemented based on etcd. ReCraft adds cluster split and merge functionality as well as single cluster membership change scheme that improves vanilla etcd. The code is a fork of etcd and everything in etcd is also included in the package. This document ("README_RECRAFT.md" in the package) describes how to install and test ReCraft. The names of example scripts are given after describing the basic operations. The scripts are provided as separate files and they include more realistic examples with multi-node settings. Although this document uses examples that uses multiple instances of etcd on a single node, by deploying etcd instances on distributed nodes and changing the IP/Port pairs to corresponding deployment would enable running ReCraft in a truely distributed setting.
 
-**Note**: The `main` branch may be in an *unstable or even broken state* during development. For stable versions, see [releases][github-release].
+Besides the basic workings of ReCraft in this document, the evaluation directory in the package contains scripts that we used to deploy and evaluate ReCraft on our distributed cluster. These scripts are used to collect numbers that are used to generate the graphs in the paper. 
 
-![etcd Logo](logos/etcd-horizontal-color.svg)
+## 1. ReCraft Cluster Setup Guide
 
-etcd is a distributed reliable key-value store for the most critical data of a distributed system, with a focus on being:
+The installation process for ReCraft is pretty much the same as installing etcd. 
 
-* *Simple*: well-defined, user-facing API (gRPC)
-* *Secure*: automatic TLS with optional client cert authentication
-* *Fast*: benchmarked 10,000 writes/sec
-* *Reliable*: properly distributed using Raft
+### Pre-requisites
 
-etcd is written in Go and uses the [Raft][] consensus algorithm to manage a highly-available replicated log.
+#### Install Go
+Follow the instructions to install Go: [https://go.dev/doc/install](https://go.dev/doc/install).
+#### Install Python
+Ensure Python 3.13 or higher is installed. You can check your Python version with:
+```bash
+python3 --version
+```
+If Python is not installed, download it from [python.org](https://www.python.org/downloads/) or use your system's package manager.
 
-etcd is used [in production by many companies](./ADOPTERS.md), and the development team stands behind it in critical deployment scenarios, where etcd is frequently teamed with applications such as [Kubernetes][k8s], [locksmith][], [vulcand][], [Doorman][], and many others. Reliability is further ensured by [**rigorous testing**](https://github.com/etcd-io/etcd/tree/main/tests/functional).
+#### Set Up a Virtual Environment 
+Create a virtual environment to isolate dependencies:
+```bash
+python3 -m venv .venv
+```
+Activate the virtual environment:
+- On macOS/Linux:
+    ```bash
+    source .venv/bin/activate
+    ```
+- On Windows:
+    ```bash
+    .venv\Scripts\activate
+    ```
 
-See [etcdctl][etcdctl] for a simple command line client.
+#### Install Required Python Packages
+Install `fabric` and `requests` using `pip`:
+```bash
+pip3 install fabric requests
+```
 
-[raft]: https://raft.github.io/
-[k8s]: http://kubernetes.io/
-[doorman]: https://github.com/youtube/doorman
-[locksmith]: https://github.com/coreos/locksmith
-[vulcand]: https://github.com/vulcand/vulcand
-[etcdctl]: https://github.com/etcd-io/etcd/tree/main/etcdctl
+Verify the installation:
+```bash
+pip3 show fabric requests
+```
 
-## Community meetings
+### Setting Up Your Environment
 
-etcd contributors and maintainers have monthly (every four weeks) meetings at 11:00 AM (USA Pacific) on Thursday.
+#### Install gobin
+```bash
+go install github.com/myitcv/gobin@latest
+```
 
-An initial agenda will be posted to the [shared Google docs][shared-meeting-notes] a day before each meeting, and everyone is welcome to suggest additional topics or other agendas.
+#### Add Go Binaries to PATH
+```bash
+export PATH=$PATH:$(go env GOPATH)/bin
+```
 
-[shared-meeting-notes]: https://docs.google.com/document/d/16XEGyPBisZvmmoIHSZzv__LoyOeluC5a4x353CX0SIM/edit
+### Building the Binaries
 
+#### Build `etcd` and `etcdctl`
+At the root of the repository, run:
+```bash
+make build
+```
 
-Time:
-- [Jan 10th, 2019 11:00 AM video](https://www.youtube.com/watch?v=0Cphtbd1OSc&feature=youtu.be)
-- [Feb 7th, 2019 11:00 AM video](https://youtu.be/U80b--oAlYM)
-- [Mar 7th, 2019 11:00 AM video](https://youtu.be/w9TI5B7D1zg)
-- [Apr 4th, 2019 11:00 AM video](https://youtu.be/oqQR2XH1L_A)
-- [May 2nd, 2019 11:00 AM video](https://youtu.be/wFwQePuDWVw)
-- [May 30th, 2019 11:00 AM video](https://youtu.be/2t1R5NATYG4)
-- [Jul 11th, 2019 11:00 AM video](https://youtu.be/k_FZEipWD6Y)
-- [Jul 25, 2019 11:00 AM video](https://youtu.be/VSUJTACO93I)
-- [Aug 22, 2019 11:00 AM video](https://youtu.be/6IBQ-VxQmuM)
-- [Sep 19, 2019 11:00 AM video](https://youtu.be/SqfxU9DhBOc)
-- Nov 14, 2019 11:00 AM
-- Dec 12, 2019 11:00 AM
-- Jan 09, 2020 11:00 AM
-- Feb 06, 2020 11:00 AM
-- Mar 05, 2020 11:00 AM
-- Apr 02, 2020 11:00 AM
-- Apr 30, 2020 11:00 AM
-- May 28, 2020 11:00 AM
-- Jun 25, 2020 11:00 AM
-- Jul 23, 2020 11:00 AM
-- Aug 20, 2020 11:00 AM
-- Sep 17, 2020 11:00 AM
-- Oct 15, 2020 11:00 AM
-- Nov 12, 2020 11:00 AM
-- Dec 10, 2020 11:00 AM
+#### Set `LOCAL_ETCD_DIR` Environment Variable
+Set the `LOCAL_ETCD_DIR` environment variable to the root of the repository:
+```bash
+export LOCAL_ETCD_DIR=$(pwd)
+```
+This ensures that scripts and tools referencing this variable can locate the repository's root directory.
 
-Join Hangouts Meet: [meet.google.com/umg-nrxn-qvs](https://meet.google.com/umg-nrxn-qvs)
+#### Add `etcd` and `etcdctl` to PATH
+At the root of the repository, run:
+```bash
+export PATH=$PATH:$LOCAL_ETC_DIR/bin
+```
 
-Join by phone: +1 405-792-0633‬ PIN: ‪299 906‬#
+#### Build the Server Binary
+Navigate to the `server` directory and run:
+```bash
+go build -o server
+```
 
+## 2. Starting a Cluster
 
-## Getting started
+The following is a basic methodology to deploy a small cluster.
+### Start a 3-Node Cluster
+Navigate to the `deploy` directory (which contains the `fabfile`) and run:
+```bash
+fab start 1=http://127.0.0.1:1380,2=http://127.0.0.1:2380,3=http://127.0.0.1:3380
+```
 
-### Getting etcd
+## 3. Managing Clusters using Split and Merge features of ReCraft
 
-The easiest way to get etcd is to use one of the pre-built release binaries which are available for OSX, Linux, Windows, and Docker on the [release page][github-release].
+### Split a Cluster into Multiple Subclusters
+First, get member IDs(HEX IDs) using:
+```bash
+etcdctl --write-out=table member list
+```
 
-For more installation guides, please check out [play.etcd.io](http://play.etcd.io) and [operating etcd](https://etcd.io/docs/latest/op-guide).
+Then split the cluster:
+```bash
+etcdctl --endpoints=<endpoints> member split <member_ids_group1> <member_ids_group2>
+```
+**Example:**
+```bash
+etcdctl --endpoints=http://127.0.0.1:1380,http://127.0.0.1:2380,http://127.0.0.1:3380,http://127.0.0.1:4380,http://127.0.0.1:5380 member split 7ac641502b72a71a,b71f75320dc06a6c,d07d5325fff892c1 b7bacd4212cc9323,a100ada638d79265
+```
 
-For those wanting to try the very latest version, [build the latest version of etcd][dl-build] from the `main` branch. This first needs [*Go*](https://golang.org/) installed ([version 1.16+](/go.mod#L3) is required). All development occurs on `main`, including new features and bug fixes. Bug fixes are first targeted at `main` and subsequently ported to release branches, as described in the [branch management][branch-management] guide.
+### Merge Multiple Subclusters into a Single Cluster
+```bash
+etcdctl member merge <cluster_member_url1>,<cluster_member_url2>
+```
+**Example:**
+```bash
+etcdctl member merge http://127.0.0.1:2380,http://127.0.0.1:4380
+```
 
-[github-release]: https://github.com/etcd-io/etcd/releases
-[branch-management]: https://etcd.io/docs/latest/branch_management
-[dl-build]: https://etcd.io/docs/latest/dl-build#build-the-latest-version
+### Testing Split and Merge Functionality
 
-### Running etcd
-
-First start a single-member cluster of etcd.
-
-If etcd is installed using the [pre-built release binaries][github-release], run it from the installation location as below:
+You can test the split and merge functionality using the provided script at the root:
 
 ```bash
-/tmp/etcd-download-test/etcd
+./test_sm.sh
 ```
 
-The etcd command can be simply run as such if it is moved to the system path as below:
+## 4. Single Cluster Membership Change (i.e., Adding and Removing Nodes)
+
+The ReCraft code package includes three different reconfiguration schemes in the ReCraft paper (DSN 2025): (1) ReCraft single cluster membership change, (2) Raft one-at-a-time single cluster membership change (AR-RPC), and (3) Raft joint consensus single cluster membership change (JC). However, (1) subsumes (2) so we introduce how to run (1) and (3). To trigger (2) one only needs to add/remove one node at a time using approach (1).
+
+### (1) Using ReCraft Single Cluster Membership Change (subsumes (2))
+To use ReCraft single cluster membership change, one may go through one or two steps. When adding or removing one mode, simply adding and removing suffices and this is the same as Raft one-at-a-time (AR-RPC) approach. When adding two nodes to even numbered cluster, simply adding the nodes suffices. When adding/removing two or more nodes in other cases, one must first enter joint mode by adding/removing nodes and then leave joint mode. As the paper describes ReCraft can only remove nodes fewers than the quorum size of the old configuration.
+
+**Add a Node:**
+```bash
+etcdctl member joint --add <node_url> --mode recraft
+```
+**Example:**
+```bash
+etcdctl member joint --add http://127.0.0.1:4380 --mode recraft
+```
+**Script:**
+You can test the functionality of adding a single node using the ReCraft consensus with the provided script located at the root:
+```bash
+./test_scm_add_single.sh
+```
+
+**Add Multiple Nodes:**
+```bash
+etcdctl member joint --add <node_url1>,<node_url2> --mode recraft
+```
+**Example:**
+```bash
+etcdctl member joint --add http://127.0.0.1:4380,http://127.0.0.1:5380 --mode recraft
+```
+**Leave Joint Consensus:**
+```bash
+etcdctl member leave joint
+```
+**Script:**
+You can test the functionality of adding multiple nodes using the ReCraft consensus with an explicit leave joint command by using the provided script located at the root:
+```bash
+./test_scm_add_multiple_explicit_leave.sh
+```
+You can test the functionality of adding multiple nodes using the ReCraft consensus with an implicit leave joint command by using the provided script located at the root:
 
 ```bash
-mv /tmp/etcd-download-test/etcd /usr/local/bin/
-etcd
+./test_scm_add_multiple_implicit_leave.sh
 ```
 
-If etcd is [built from the main branch][dl-build], run it as below:
+**Remove a Node:**
 
+First, get member IDs(HEX IDs) using:
 ```bash
-./bin/etcd
+etcdctl --write-out=table member list
 ```
-
-This will bring up etcd listening on port 2379 for client communication and on port 2380 for server-to-server communication.
-
-Next, let's set a single key, and then retrieve it:
-
-```
-etcdctl put mykey "this is awesome"
-etcdctl get mykey
-```
-
-etcd is now running and serving client requests. For more, please check out:
-
-- [Interactive etcd playground](http://play.etcd.io)
-- [Animated quick demo](https://etcd.io/docs/latest/demo)
-
-### etcd TCP ports
-
-The [official etcd ports][iana-ports] are 2379 for client requests, and 2380 for peer communication.
-
-[iana-ports]: http://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
-
-### Running a local etcd cluster
-
-First install [goreman](https://github.com/mattn/goreman), which manages Procfile-based applications.
-
-Our [Procfile script](./Procfile) will set up a local example cluster. Start it with:
-
 ```bash
-goreman start
+etcdctl --endpoints=<endpoints> member joint --remove <member_id> --mode recraft
 ```
-
-This will bring up 3 etcd members `infra1`, `infra2` and `infra3` and optionally etcd `grpc-proxy`, which runs locally and composes a cluster.
-
-Every cluster member and proxy accepts key value reads and key value writes.
-
-Follow the steps in [Procfile.learner](./Procfile.learner) to add a learner node to the cluster. Start the learner node with:
-
+**Example:**
 ```bash
-goreman -f ./Procfile.learner start
+etcdctl --endpoints=http://127.0.0.1:1380,http://127.0.0.1:2380,http://127.0.0.1:3380 member joint --remove d07d5325fff892c1 --mode recraft
+```
+**Script:**
+You can test the functionality of removing a single node using the ReCraft consensus with the provided script located at the root:
+```bash
+./test_scm_remove_single.sh
 ```
 
-### Next steps
+**Remove Multiple Nodes:**
+First, get member IDs(HEX IDs) using:
+```bash
+etcdctl --write-out=table member list
+```
+```bash
+etcdctl --endpoints=<endpoints> member joint --remove <member_id1>,<member_id2> --mode recraft
+```
+**Example:**
+```bash
+etcdctl --endpoints=http://127.0.0.1:1380,http://127.0.0.1:2380,http://127.0.0.1:3380,http://127.0.0.1:4380,http://127.0.0.1:5380 member joint --remove b7bacd4212cc9323,a100ada638d79265 --mode recraft
+```
+**Leave Joint Consensus:**
+```bash
+etcdctl member leave joint
+```
+**Script:**
+You can test the functionality of removing multiple nodes using the ReCraft consensus with an explicit leave joint command by using the provided script located at the root:
+```bash
+./test_scm_remove_multiple_explicit_leave1.sh
+```
+```bash
+./test_scm_remove_multiple_explicit_leave2.sh
+```
 
-Now it's time to dig into the full etcd API and other guides.
+### (3) Using Raft Joint Consensus Single Cluster Membership Change
 
-- Read the full [documentation][].
-- Explore the full gRPC [API][].
-- Set up a [multi-machine cluster][clustering].
-- Learn the [config format, env variables and flags][configuration].
-- Find [language bindings and tools][integrations].
-- Use TLS to [secure an etcd cluster][security].
-- [Tune etcd][tuning].
+To use Raft joint consensus single cluster membership change, one should always go through two steps: first enter joint mode by adding/removing nodes and then leave joint mode. 
 
-[documentation]: https://etcd.io/docs/latest
-[api]: https://etcd.io/docs/latest/learning/api
-[clustering]: https://etcd.io/docs/latest/op-guide/clustering
-[configuration]: https://etcd.io/docs/latest/op-guide/configuration
-[integrations]: https://etcd.io/docs/latest/integrations
-[security]: https://etcd.io/docs/latest/op-guide/security
-[tuning]: https://etcd.io/docs/latest/tuning
+**Add a Node:**
+```bash
+etcdctl member joint --add <node_url>
+```
+**Example:**
+```bash
+etcdctl member joint --add http://127.0.0.1:4380
+```
+**Script:**
+You can test the functionality of adding a single node using the Raft joint consensus with the provided script located at the root:
+```bash
+./test_joint_add_single.sh
+```
 
-## Contact
+**Add Multiple Nodes:**
+```bash
+etcdctl member joint --add <node_url1>,<node_url2>
+```
+**Example:**
+```bash
+etcdctl member joint --add http://127.0.0.1:4380,http://127.0.0.1:5380
+```
+**Script:**
+You can test the functionality of adding multiple nodes using the Raft joint consensus by using the provided script located at the root:
+```bash
+./test_joint_add_multiple.sh
+```
 
-- Mailing list: [etcd-dev](https://groups.google.com/forum/?hl=en#!forum/etcd-dev)
-- IRC: #[etcd](irc://irc.freenode.org:6667/#etcd) on freenode.org
-- Planning/Roadmap: [milestones](https://github.com/etcd-io/etcd/milestones), [roadmap](./ROADMAP.md)
-- Bugs: [issues](https://github.com/etcd-io/etcd/issues)
+**Remove a Node:**
 
-## Contributing
+First, get member IDs(HEX IDs) using:
+```bash
+etcdctl --write-out=table member list
+```
+```bash
+etcdctl --endpoints=<endpoints> member joint --remove <member_id>
+```
+**Example:**
+```bash
+etcdctl --endpoints=http://127.0.0.1:1380,http://127.0.0.1:2380,http://127.0.0.1:3380 member joint --remove d07d5325fff892c1
+```
+**Script:**
+You can test the functionality of removing a single node using the Raft joint consensus with the provided script located at the root:
+```bash
+./test_joint_remove_single.sh
+```
 
-See [CONTRIBUTING](CONTRIBUTING.md) for details on submitting patches and the contribution workflow.
+**Remove Multiple Nodes:**
+First, get member IDs(HEX IDs) using:
+```bash
+etcdctl --write-out=table member list
+```
+```bash
+etcdctl --endpoints=<endpoints> member joint --remove <member_id1>,<member_id2>
+```
+**Example:**
+```bash
+etcdctl --endpoints=http://127.0.0.1:1380,http://127.0.0.1:2380,http://127.0.0.1:3380,http://127.0.0.1:4380,http://127.0.0.1:5380 member joint --remove b7bacd4212cc9323,a100ada638d79265
+```
+**Script:**
+You can test the functionality of removing multiple nodes using the Raft joint consensus by using the provided script located at the root:
+```bash
+./test_joint_remove_multiple.sh
+```
 
-## Reporting bugs
-
-See [reporting bugs](https://etcd.io/docs/latest/reporting-bugs) for details about reporting any issues.
-
-## Reporting a security vulnerability
-
-See [security disclosure and release process](security/README.md) for details on how to report a security vulnerability and how the etcd team manages it.
-
-## Issue and PR management
-
-See [issue triage guidelines](https://etcd.io/docs/current/triage/issues/) for details on how issues are managed.
-
-See [PR management](https://etcd.io/docs/current/triage/prs/) for guidelines on how pull requests are managed.
-
-## etcd Emeritus Maintainers
-
-These emeritus maintainers dedicated a part of their career to etcd and reviewed code, triaged bugs, and pushed the project forward over a substantial period of time. Their contribution is greatly appreciated.
-
-* Fanmin Shi
-* Anthony Romano
-
-### License
-
-etcd is under the Apache 2.0 license. See the [LICENSE](LICENSE) file for details.
+**Leave Joint Consensus:**
+```bash
+etcdctl member leave joint
+```
+---
+This guide covers the essential commands for setting up, splitting, merging, and managing nodes in an ETCD cluster using both **ReCraft** and **Raft** consensus models. Customize the endpoints and member IDs to match your environment.
