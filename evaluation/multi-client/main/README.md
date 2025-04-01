@@ -41,3 +41,24 @@
     ```bash
     python repete_run.py
     ```
+
+## Remote Server Preparation for Distributed Evaluation
+
+The `distribute_client.sh` script automates the setup of multiple clients for distributed testing. It performs the following operations:
+
+### What the Script Does
+
+- Creates the directory structure `~/etcd/evaluation/multi-client/main` on each target server
+- Distributes required Go files to the appropriate servers:
+  - `split_perf_client.go` and `util.go`
+  - `merge_perf_client.go` and `util.go`
+  - `qps_perf_client.go` and `util.go`
+
+### Usage
+
+1. Modify the server IP addresses in the script to match your node IPs for client nodes (currently configured for eight specific servers)
+2. Ensure the Go files are present in the same directory as the script
+3. Run the script:
+   ```
+   ./distribute_client.sh
+   ```
