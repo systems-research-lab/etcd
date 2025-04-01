@@ -7,16 +7,13 @@ clusters:
 - - http://192.168.0.124:2380
   - http://192.168.0.154:2380
   - http://192.168.0.156:2380
-- - http://192.168.0.197:2380
-  - http://192.168.0.122:2380
-  - http://192.168.0.158:2380
 cooldown: 3
 etcdctlpath: ~/etcd/etcdctl/etcdctl
 etcdserverdir: ~/etcd/server
 etcdutlpath: ~/etcd/etcdutl/utl
 folder: ../report
-load: 10000
-repetition: 5
+load: 100
+repetition: 1
 threads: 0
 type: bench-merge
 warmup: 3

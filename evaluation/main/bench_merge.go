@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/melbahja/goph"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"log"
 	"math"
 	"os"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/melbahja/goph"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 const (
@@ -147,7 +148,7 @@ func replicateBench(cfg config) (getKey, putKey, cleanUp, join, restart time.Dur
 	wg = sync.WaitGroup{}
 	for offset < len(kvs) {
 		wg.Add(1)
-		size := len(kvs) / numThread + 1
+		size := len(kvs)/numThread + 1
 		go func(offset int, size int) {
 			putCli := mustCreateClient(cfg.Clusters[0]...)
 			for j := offset; j < offset+size && j < len(kvs); j++ {
@@ -177,7 +178,7 @@ func replicateBench(cfg config) (getKey, putKey, cleanUp, join, restart time.Dur
 	for _, clr := range cfg.Clusters[1:] {
 		addPeerAddr = append(addPeerAddr, clr...)
 	}
-	if _, err := mustCreateClient(cfg.Clusters[0]...).MemberJoint(context.TODO(), addPeerAddr, nil); err != nil {
+	if _, err := mustCreateClient(cfg.Clusters[0]...).MemberJoint(context.TODO(), addPeerAddr, nil, "recraft"); err != nil {
 		log.Panicf("add members failed: %v\n", err)
 	}
 	joinTime := time.Now()

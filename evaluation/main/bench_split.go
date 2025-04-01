@@ -190,7 +190,7 @@ func restoreBench(cfg config) (snapshot, remove, restore, restart time.Duration)
 
 	// remove nodes
 	etcdCli := mustCreateClient(cfg.Clusters[0][0])
-	_, err := etcdCli.MemberJoint(context.TODO(), nil, getMemberIds(endpoints[len(cfg.Clusters[0]):]))
+	_, err := etcdCli.MemberJoint(context.TODO(), nil, getMemberIds(endpoints[len(cfg.Clusters[0]):]), "recraft")
 	if err != nil {
 		log.Panicf("remove members failed: %v\n", err)
 	}
