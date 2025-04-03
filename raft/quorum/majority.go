@@ -16,7 +16,6 @@ package quorum
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"sort"
 	"strings"
@@ -220,7 +219,7 @@ func (c MajorityConfig) VoteResult(votes map[uint64]bool, quorum uint64) VoteRes
 		q = len(c)/2 + 1
 		// fmt.Println("quorum is zero")
 		// fmt.Printf("quorum is %[1]d\n", q)
-		log.Print(q)
+		// log.Print(q)
 	}
 	if ny[1] >= q {
 		//log.Printf("WON %[1]d\n", q)

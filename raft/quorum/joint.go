@@ -15,7 +15,6 @@
 package quorum
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -70,7 +69,7 @@ func (c JointConfig) CommittedIndex(l AckedIndexer, quorum uint64) Index {
 // a result indicating whether the vote is pending, lost, or won. A joint quorum
 // requires both majority quorums to vote in favor.
 func (c JointConfig) VoteResult(votes map[uint64]bool, quorum uint64, rjoint bool) VoteResult {
-	fmt.Println("JointConfig.VoteResult")
+	// fmt.Println("JointConfig.VoteResult")
 
 	if len(c[1]) > 0 { // Joint Configuration
 		if rjoint { // Recraft Joint Configuration

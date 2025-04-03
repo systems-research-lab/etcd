@@ -58,6 +58,7 @@ import (
 	"go.etcd.io/etcd/server/v3/auth"
 	"go.etcd.io/etcd/server/v3/etcdserver/api"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
+	"go.etcd.io/etcd/server/v3/etcdserver/api/metrics"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/rafthttp"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v2discovery"
@@ -315,6 +316,8 @@ type EtcdServer struct {
 	appliedConfEntry map[string]struct{}
 
 	m merger
+
+	requestTracker *metrics.RequestTracker
 }
 
 type backendHooks struct {
@@ -608,6 +611,7 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		AccessController:   &AccessController{CORS: cfg.CORS, HostWhitelist: cfg.HostWhitelist},
 		consistIndex:       ci,
 		firstCommitInTermC: make(chan struct{}),
+		requestTracker:     metrics.NewRequestTracker(10000, cfg.Logger),
 	}
 	serverID.With(prometheus.Labels{"server_id": id.String()}).Set(1)
 
@@ -1035,6 +1039,7 @@ func (s *EtcdServer) Process(ctx context.Context, m raftpb.Message) error {
 	if m.Type == raftpb.MsgApp {
 		s.stats.RecvAppendReq(types.ID(m.From).String(), m.Size())
 	}
+	go s.requestTracker.ProcessRaftMessage(m)
 	return s.r.Step(ctx, m)
 }
 

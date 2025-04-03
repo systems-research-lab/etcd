@@ -133,6 +133,8 @@ func (s *EtcdServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeRe
 		err = serr
 		return nil, err
 	}
+
+	go s.requestTracker.RecordGetRequest()
 	return resp, err
 }
 
