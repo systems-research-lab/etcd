@@ -1039,7 +1039,9 @@ func (s *EtcdServer) Process(ctx context.Context, m raftpb.Message) error {
 	if m.Type == raftpb.MsgApp {
 		s.stats.RecvAppendReq(types.ID(m.From).String(), m.Size())
 	}
-	go s.requestTracker.ProcessRaftMessage(m)
+	if s.isLeader() {
+		go s.requestTracker.ProcessRaftMessage(m)
+	}
 	return s.r.Step(ctx, m)
 }
 

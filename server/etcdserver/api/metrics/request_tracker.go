@@ -52,7 +52,7 @@ func NewRequestTracker(interval int, logger *zap.Logger) *RequestTracker {
 }
 
 func (t *RequestTracker) ProcessRaftMessage(m raftpb.Message) {
-	if m.Type == raftpb.MsgApp {
+	if m.Type == raftpb.MsgProp {
 		for _, entry := range m.Entries {
 			if entry.Type == raftpb.EntryNormal {
 				// Check if the entry is a put request
