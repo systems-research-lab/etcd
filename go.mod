@@ -35,4 +35,5 @@ require (
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/grpc v1.41.0
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
+	gopkg.in/yaml.v2 v2.4.0
 )

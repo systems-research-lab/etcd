@@ -1,0 +1,35 @@
+endpoints:
+  - "http://127.0.0.1:1380"
+  - "http://127.0.0.1:2380"
+  - "http://127.0.0.1:3380"
+  - "http://127.0.0.1:6380"
+  - "http://127.0.0.1:7380"
+
+# operation: split
+# subClusters:
+#   - ["http://127.0.0.1:1380", "http://127.0.0.1:2380", "http://127.0.0.1:3380"]
+#   - ["http://127.0.0.1:6380", "http://127.0.0.1:7380"]
+
+# operation: merge
+# subClusters:
+#   - ["http://127.0.0.1:1380", "http://127.0.0.1:2380", "http://127.0.0.1:3380"]
+#   - ["http://127.0.0.1:6380", "http://127.0.0.1:7380"]
+
+# operation: joint_add
+# mode: raft
+# addPeers:
+#   - "http://127.0.0.1:4380"
+
+# operation: leave_joint
+
+# operation: joint_add
+# mode: recraft
+# addPeers:
+#   - "http://127.0.0.1:5380"
+
+# operation: joint_remove
+# mode: recraft
+# removePeers:
+#   - "1a99b4b14094011e"
+
+# operation: leave_joint
